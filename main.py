@@ -833,7 +833,7 @@ class ColorEditor(editor.ColorSetting):
 
 
 #################################################
-# Main Dialog
+# Editor Dialog
 #################################################
 class Editor(editor.EditorFrame):
     def __init__(self, parent, scheme, j_file, t_file):
@@ -982,6 +982,9 @@ class Editor(editor.EditorFrame):
         event.Skip()
 
 
+#################################################
+# Main
+#################################################
 def main(script):
     global log
     cs = None
