@@ -1,5 +1,5 @@
 """
-File Strip
+Color Scheme Editor for Sublime Text
 Licensed under MIT
 Copyright (c) 2013 Isaac Muse <isaacmuse@gmail.com>
 """
