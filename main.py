@@ -13,9 +13,10 @@ import wx
 import editor
 from _lib.rgba import RGBA
 import uuid
-from os.path import exists, normpath, join, dirname
+from os.path import exists, normpath, join, dirname, abspath
 from os import remove
 import _lib.simplelog as Log
+from _lib.default_new_theme import theme as default_new_theme
 
 __version__ = "0.0.2"
 
@@ -983,6 +984,31 @@ class Editor(editor.EditorFrame):
 
 
 #################################################
+# Basic Dialogs
+#################################################
+def filepicker(parent, msg, wildcard, save=False):
+    select = None
+    style = wx.OPEN | wx.FILE_MUST_EXIST if not save else wx.SAVE | wx.OVERWRITE_PROMPT
+    dialog = wx.FileDialog(
+        parent, msg,
+        "", wildcard=wildcard,
+        style=style
+    )
+    if dialog.ShowModal() == wx.ID_OK:
+        select = dialog.GetPath()
+        dialog.Destroy()
+    return select
+
+
+def yesno(parent, question, caption = 'Yes or no?', yes="Okay", no="Cancel"):
+    dlg = wx.MessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
+    dlg.SetYesNoLabels(yes, no)
+    result = dlg.ShowModal() == wx.ID_YES
+    dlg.Destroy()
+    return result
+
+
+#################################################
 # Main
 #################################################
 def main(script):
@@ -995,7 +1021,11 @@ def main(script):
     parser.add_argument('--version', action='version', version=('%(prog)s ' + __version__))
     parser.add_argument('--debug', '-d', action='store_true', default=False, help=argparse.SUPPRESS)
     parser.add_argument('--log', '-l', nargs='?', default=script, help="Absolute path to directory to store log file")
-    parser.add_argument('--json', '-j', action='store_true', default=False, help='json tmTheme file')
+    # Mutually exclusinve flags
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--select', '-s', action='store_true', default=False, help="Prompt for theme selection")
+    group.add_argument('--new', '-n', action='store_true', default=False, help="Open prompting for new theme to create")
+    #Positional
     parser.add_argument('file', nargs='?', default=None, help='Theme file')
     args = parser.parse_args()
 
@@ -1010,25 +1040,38 @@ def main(script):
     app = CustomApp(redirect=True)
 
     if args.file is None:
-        log.debug("Show file picker.")
-        wildcard = "*.tmTheme.JSON" if args.json else "*.tmTheme"
-        dialog = wx.FileDialog(
-            None, "Choose a theme file:",
-            "", wildcard=wildcard
-        )
-        if dialog.ShowModal() == wx.ID_OK:
-            args.file = dialog.GetPath()
-            log.debug("File selectd: %s" % args.file)
-            dialog.Destroy()
+        select = False
+        if not args.select and not args.new:
+            select = yesno(None, "Create a new theme or select an existing one?", "Color Scheme Editor", "Select", "New")
+        elif args.select:
+            select = True
+        if select:
+            result = filepicker(None, "Choose a theme file:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON")
+            if result is not None:
+                args.file = result
+                log.debug("File selectd: %s" % args.file)
+        else:
+            result = filepicker(None, "Theme file to save:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON", True)
+            if result is not None:
+                if result.lower().endswith("tmtheme.json"):
+                    with codec_open(result, "w", "utf-8") as f:
+                        f.write((json.dumps(default_new_theme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
+                else:
+                    with codec_open(result, "w", "utf-8") as f:
+                        f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
+                args.file = result
+                log.debug("File selectd: %s" % args.file)
 
     if args.file is not None:
+        is_json = args.file.lower().endswith("tmtheme.json")
+
         try:
             with open(args.file, "r") as f:
-                cs = json.loads(sanitize_json(f.read(), True)) if args.json else readPlist(f)
+                cs = json.loads(sanitize_json(f.read(), True)) if is_json else readPlist(f)
         except:
             wx.MessageBox('Unexpected problem trying to parse file!', 'ERROR', wx.OK | wx.ICON_ERROR)
 
-        if args.json:
+        if is_json:
             j_file = args.file
             t_file = args.file[:-5]
         else:
@@ -1045,9 +1088,9 @@ def main(script):
 
 if __name__ == "__main__":
     if sys.platform == "darwin" and len(sys.argv) > 1 and sys.argv[1].startswith("-psn"):
-        script_path = join(dirname(sys.argv[0]), "..", "..", "..")
+        script_path = join(dirname(abspath(sys.argv[0])), "..", "..", "..")
         del sys.argv[1]
     else:
-        script_path = dirname(sys.argv[0])
+        script_path = dirname(abspath(sys.argv[0]))
 
     sys.exit(main(script_path))
