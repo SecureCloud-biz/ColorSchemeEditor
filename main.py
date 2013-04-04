@@ -18,7 +18,7 @@ from os import remove
 import _lib.simplelog as Log
 from _lib.default_new_theme import theme as default_new_theme
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 BG_COLOR = None
 FG_COLOR = None
@@ -148,10 +148,6 @@ class GridHelper(object):
                 return
             elif event.GetKeyCode() == 0x49:
                 self.insert_row_before(grid, event)
-                # if event.ShiftDown():
-                #     self.insert_row_before(grid, event)
-                # else:
-                #     self.insert_row_after(grid, event)
                 return
         if event.ControlDown() or event.ShiftDown():
             if event.GetKeyCode() == wx.WXK_UP:
@@ -179,7 +175,6 @@ class GridHelper(object):
             [grid.SetCellTextColour(row - 1, x, fg[x]) for x in range(0, 5)]
             [grid.SetCellFont(row - 1, x, font[x]) for x in range(0, 5)]
             grid.GetParent().rebuild()
-            # grid.GoToCell(row - 1, col)
         grid.SetFocus()
         event.Skip()
 
@@ -198,7 +193,6 @@ class GridHelper(object):
             [grid.SetCellTextColour(row + 1, x, fg[x]) for x in range(0, 5)]
             [grid.SetCellFont(row + 1, x, font[x]) for x in range(0, 5)]
             grid.GetParent().rebuild()
-            # grid.GoToCell(row + 1, col)
         grid.SetFocus()
         event.Skip()
 
@@ -264,14 +258,18 @@ class GridHelper(object):
                 text[1]
             ).Show()
 
-    def insert_row_after(self, grid, event):
-        row = grid.GetGridCursorRow()
-        pass
-
     def delete_row(self, grid, event):
         row = grid.GetGridCursorRow()
+        col = grid.GetGridCursorCol()
         grid.DeleteRows(row, 1)
-        grid.GetParent().rebuild()
+        name = grid.GetCellValue(row, 0)
+        if (
+            isinstance(grid.GetParent(), GlobalSettings) and
+            (name == "foreground" or name == "background")
+        ):
+            grid.GetParent().reshow(row, col)
+        else:
+            grid.GetParent().rebuild()
 
 
 #################################################
@@ -410,13 +408,14 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
 
 
 class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
-    def __init__(self, parent, scheme, rebuild):
+    def __init__(self, parent, scheme, rebuild, reshow):
         super(GlobalSettings, self).__init__(parent)
         self.parent = parent
         wx.EVT_MOTION(self.m_plist_grid.GetGridWindow(), self.on_mouse_motion)
         self.m_plist_grid.SetDefaultCellBackgroundColour(self.GetBackgroundColour())
         self.read_plist(scheme)
         self.rebuild = rebuild
+        self.reshow = reshow
 
     def read_plist(self, scheme):
         foreground = RGBA(scheme["settings"][0]["settings"].get("foreground", "#000000"))
@@ -473,7 +472,10 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         row = self.m_plist_grid.GetGridCursorRow()
         col = self.m_plist_grid.GetGridCursorCol()
         self.update_row(row, key, value)
-        self.rebuild()
+        if key == "background" or key == "foreground":
+            self.reshow(row, col)
+        else:
+            self.rebuild()
         self.m_plist_grid.BeginBatch()
         nb_size = self.parent.GetSize()
         total_size = 0
@@ -845,7 +847,7 @@ class Editor(editor.EditorFrame):
         self.scheme = scheme
         self.json = j_file
         self.tmtheme = t_file
-        self.m_global_settings = GlobalSettings(self.m_plist_notebook, scheme, self.rebuild_plist)
+        self.m_global_settings = GlobalSettings(self.m_plist_notebook, scheme, self.rebuild_plist, self.rebuild_tables)
         self.m_style_settings = StyleSettings(self.m_plist_notebook, scheme, self.rebuild_plist)
 
         self.m_plist_name_textbox.SetValue(scheme["name"])
@@ -894,13 +896,13 @@ class Editor(editor.EditorFrame):
             with codec_open(self.json, "w", "utf-8") as f:
                 f.write((json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
         except:
-            wx.MessageBox('Unexpected problem trying to write .tmTheme.JSON file!', 'ERROR', wx.OK | wx.ICON_ERROR)
+            error('Unexpected problem trying to write .tmTheme.JSON file!')
 
         try:
             with codec_open(self.tmtheme, "w", "utf-8") as f:
                 f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
         except:
-            wx.MessageBox('Unexpected problem trying to write .tmTheme file!', 'ERROR', wx.OK | wx.ICON_ERROR)
+            error('Unexpected problem trying to write .tmTheme file!')
 
     def rebuild_tables(self, cur_row, cur_col):
         self.rebuild_plist()
@@ -927,7 +929,7 @@ class Editor(editor.EditorFrame):
         cur_page = self.m_plist_notebook.GetSelection()
         grid = self.m_global_settings.m_plist_grid if cur_page == 0 else self.m_style_settings.m_plist_grid
         row, col = grid.GetGridCursorRow(), grid.GetGridCursorCol()
-        self.rebuild_plist(row, col)
+        self.rebuild_plist()
 
     def on_plist_name_blur(self, event):
         set_name = self.m_plist_name_textbox.GetValue()
@@ -950,7 +952,7 @@ class Editor(editor.EditorFrame):
                 self.update_plist()
         except:
             self.on_uuid_button_click(event)
-            wx.MessageBox('UUID is invalid! A new UUID has been generated.', 'ERROR', wx.OK | wx.ICON_ERROR)
+            error('UUID is invalid! A new UUID has been generated.')
 
     def set_style_object(self, obj):
         self.m_style_settings.set_object(obj)
@@ -1008,14 +1010,61 @@ def yesno(parent, question, caption = 'Yes or no?', yes="Okay", no="Cancel"):
     return result
 
 
+def error(msg):
+    wx.MessageBox(msg, 'ERROR', wx.OK | wx.ICON_ERROR)
+
+
 #################################################
-# Main
+# Helper Functions
 #################################################
-def main(script):
-    global log
-    cs = None
+def query_user_for_file(select_file, new_file):
+    file_path = None
+    select = False
+    if not select_file and not new_file:
+        select = yesno(None, "Create a new theme or select an existing one?", "Color Scheme Editor", "Select", "New")
+    elif select_file:
+        select = True
+    if select:
+        result = filepicker(None, "Choose a theme file:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON")
+        if result is not None:
+            file_path = result
+            log.debug("File selectd: %s" % file_path)
+    else:
+        result = filepicker(None, "Theme file to save:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON", True)
+        if result is not None:
+            if result.lower().endswith("tmtheme.json"):
+                with codec_open(result, "w", "utf-8") as f:
+                    f.write((json.dumps(default_new_theme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
+            else:
+                with codec_open(result, "w", "utf-8") as f:
+                    f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
+            file_path = result
+            log.debug("File selectd: %s" % file_path)
+    return file_path
+
+def parse_file(file_path):
     j_file = None
     t_file = None
+    color_scheme = None
+    is_json = file_path.lower().endswith("tmtheme.json")
+
+    try:
+        with open(file_path, "r") as f:
+            color_scheme = json.loads(sanitize_json(f.read(), True)) if is_json else readPlist(f)
+    except:
+        error('Unexpected problem trying to parse file!')
+
+    if is_json:
+        j_file = file_path
+        t_file = file_path[:-5]
+    else:
+        j_file = file_path + ".JSON"
+        t_file = file_path
+
+    return j_file, t_file, color_scheme
+
+
+def parse_arguments(script):
     parser = argparse.ArgumentParser(prog='subclrschm', description='Sublime Color Scheme Editor - Edit Sublime Color Scheme')
     # Flag arguments
     parser.add_argument('--version', action='version', version=('%(prog)s ' + __version__))
@@ -1027,7 +1076,18 @@ def main(script):
     group.add_argument('--new', '-n', action='store_true', default=False, help="Open prompting for new theme to create")
     #Positional
     parser.add_argument('file', nargs='?', default=None, help='Theme file')
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+#################################################
+# Main
+#################################################
+def main(script):
+    global log
+    cs = None
+    j_file = None
+    t_file = None
+    args = parse_arguments(script)
 
     if exists(args.log):
         args.log = join(normpath(args.log), 'subclrschm.log')
@@ -1040,43 +1100,10 @@ def main(script):
     app = CustomApp(redirect=True)
 
     if args.file is None:
-        select = False
-        if not args.select and not args.new:
-            select = yesno(None, "Create a new theme or select an existing one?", "Color Scheme Editor", "Select", "New")
-        elif args.select:
-            select = True
-        if select:
-            result = filepicker(None, "Choose a theme file:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON")
-            if result is not None:
-                args.file = result
-                log.debug("File selectd: %s" % args.file)
-        else:
-            result = filepicker(None, "Theme file to save:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON", True)
-            if result is not None:
-                if result.lower().endswith("tmtheme.json"):
-                    with codec_open(result, "w", "utf-8") as f:
-                        f.write((json.dumps(default_new_theme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
-                else:
-                    with codec_open(result, "w", "utf-8") as f:
-                        f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
-                args.file = result
-                log.debug("File selectd: %s" % args.file)
+        args.file = query_user_for_file(args.select, args.new)
 
     if args.file is not None:
-        is_json = args.file.lower().endswith("tmtheme.json")
-
-        try:
-            with open(args.file, "r") as f:
-                cs = json.loads(sanitize_json(f.read(), True)) if is_json else readPlist(f)
-        except:
-            wx.MessageBox('Unexpected problem trying to parse file!', 'ERROR', wx.OK | wx.ICON_ERROR)
-
-        if is_json:
-            j_file = args.file
-            t_file = args.file[:-5]
-        else:
-            j_file = args.file + ".JSON"
-            t_file = args.file
+        j_file, t_file, cs = parse_file(args.file)
 
     if j_file is not None and t_file is not None:
         main_win = Editor(None, cs, j_file, t_file)
@@ -1085,6 +1112,7 @@ def main(script):
 
     log.debug("Exiting")
     return 0
+
 
 if __name__ == "__main__":
     if sys.platform == "darwin" and len(sys.argv) > 1 and sys.argv[1].startswith("-psn"):
