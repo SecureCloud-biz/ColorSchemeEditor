@@ -18,7 +18,7 @@ from os import remove
 import _lib.simplelog as Log
 from _lib.default_new_theme import theme as default_new_theme
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 BG_COLOR = None
 FG_COLOR = None
@@ -1020,26 +1020,41 @@ def error(msg):
 def query_user_for_file(select_file, new_file):
     file_path = None
     select = False
+    done = False
+    if sys.platform == "darwin":
+        wildcard = "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.JSON"
+    else:
+        wildcard = "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON"
     if not select_file and not new_file:
         select = yesno(None, "Create a new theme or select an existing one?", "Color Scheme Editor", "Select", "New")
     elif select_file:
         select = True
-    if select:
-        result = filepicker(None, "Choose a theme file:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON")
-        if result is not None:
-            file_path = result
-            log.debug("File selectd: %s" % file_path)
-    else:
-        result = filepicker(None, "Theme file to save:", "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON", True)
-        if result is not None:
-            if result.lower().endswith("tmtheme.json"):
-                with codec_open(result, "w", "utf-8") as f:
-                    f.write((json.dumps(default_new_theme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
-            else:
-                with codec_open(result, "w", "utf-8") as f:
-                    f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
-            file_path = result
-            log.debug("File selectd: %s" % file_path)
+    while not done:
+        if select:
+            result = filepicker(None, "Choose a theme file:", wildcard)
+            if result is not None:
+                log.debug(result)
+                if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
+                    error("File must be of type '.tmtheme' or '.tmtheme.json'")
+                    continue
+                file_path = result
+                log.debug("File selectd: %s" % file_path)
+            done = True
+        else:
+            result = filepicker(None, "Theme file to save:", wildcard, True)
+            if result is not None:
+                if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
+                    error("File must be of type '.tmtheme' or '.tmtheme.json'")
+                    continue
+                if result.lower().endswith("tmtheme.json"):
+                    with codec_open(result, "w", "utf-8") as f:
+                        f.write((json.dumps(default_new_theme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
+                else:
+                    with codec_open(result, "w", "utf-8") as f:
+                        f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
+                file_path = result
+                log.debug("File selectd: %s" % file_path)
+            done = True
     return file_path
 
 def parse_file(file_path):
