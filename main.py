@@ -1,3 +1,4 @@
+ # -*- coding: utf-8 -*-
 """
 Color Scheme Editor for Sublime Text
 Licensed under MIT
@@ -21,7 +22,43 @@ __version__ = "0.0.4"
 
 BG_COLOR = None
 FG_COLOR = None
+DEBUG_CONSOLE = False
 
+SHORTCUTS = {
+    "osx": '''
+===Applicatioon Shortcuts===
+Find Next: ⌘ + F
+Find Next: ⌘ + G
+Find Prev: ⌘ + ⇧ + G
+Save As: ⌘ + S
+
+===Table Shortcuts===
+Edit Row: Enter
+Move Row Up (Style Settings): ⌥ + ↑
+Move Row Down (Style Settings): ⌥ + ↓
+Switch to Global Settings: ⌥ + ←
+Switch to Style Settings: ⌥ + →
+Delete Row: ⌫
+Insert Row: ⌘ + I
+''',
+
+    "windows": '''
+===Applicatioon Shortcuts===
+Find Next: ^ + F
+Find Next: ^ + G
+Find Prev: ^ + ⇧ + G
+Save As: ^ + S
+
+===Table Shortcuts===
+Edit Row: Enter
+Move Row Up (Style Settings): ⌥ + ↑
+Move Row Down (Style Settings): ⌥ + ↓
+Switch to Global Settings: ⌥ + ←
+Switch to Style Settings: ⌥ + →
+Delete Row: ⌫
+Insert Row: ^ + I
+'''
+}
 
 #################################################
 # Debug and Logging
@@ -30,7 +67,7 @@ log = None
 
 
 def log_gui(msg):
-    log.info(msg, "%(message)s")
+    log.info(msg, "%(message)s", echo=False)
 
 
 class CustomLog(wx.PyOnDemandOutputWindow):
@@ -38,17 +75,21 @@ class CustomLog(wx.PyOnDemandOutputWindow):
         if self.frame is None:
             if not wx.Thread_IsMain():
                 wx.CallAfter(log_gui, text)
-                # wx.CallAfter(self.CreateOutputWindow, text)
+                if DEBUG_CONSOLE:
+                    wx.CallAfter(self.CreateOutputWindow, text)
             else:
                 log_gui(text)
-                # self.CreateOutputWindow(text)
+                if DEBUG_CONSOLE:
+                    self.CreateOutputWindow(text)
         else:
             if not wx.Thread_IsMain():
                 wx.CallAfter(log_gui, text)
-                # wx.CallAfter(self.text.AppendText, text)
+                if DEBUG_CONSOLE:
+                    wx.CallAfter(self.text.AppendText, text)
             else:
                 log_gui(text)
-                # self.text.AppendText(text)
+                if DEBUG_CONSOLE:
+                    self.text.AppendText(text)
 
 
 class CustomApp(wx.App):
@@ -123,9 +164,11 @@ class GridHelper(object):
             not event.MetaDown() and
             not event.ShiftDown()
         ):
+            # Delete Row
             if event.GetKeyCode() == wx.WXK_DELETE:
                 self.delete_row(grid, event)
                 return
+            # Edit Row
             elif event.GetKeyCode() == wx.WXK_RETURN:
                 if isinstance(grid.GetParent(), StyleSettings):
                     grid.GetParent().edit_style(grid)
@@ -133,28 +176,47 @@ class GridHelper(object):
                     grid.GetParent().edit_global(grid)
                 return
         elif event.AltDown():
-            if event.GetKeyCode() == wx.WXK_UP:
-                if is_style:
-                    self.up_button_click(grid, event)
+            # Move Column
+            if not event.ControlDown() and not event.ShiftDown() and not event.RawControlDown():
+                # Move Up
+                if event.GetKeyCode() == wx.WXK_UP:
+                    if is_style:
+                        self.up_button_click(grid, event)
+                    return
+                # Move Down
+                elif event.GetKeyCode() == wx.WXK_DOWN:
+                    if is_style:
+                        self.down_button_click(grid, event)
+                    return
+                elif event.GetKeyCode() == wx.WXK_LEFT:
+                    grid.GetParent().GetParent().ChangeSelection(0)
+                    grid.GetParent().GetParent().GetPage(0).m_plist_grid.SetFocus()
+                    return
+                elif event.GetKeyCode() == wx.WXK_RIGHT:
+                    grid.GetParent().GetParent().ChangeSelection(1)
+                    grid.GetParent().GetParent().GetPage(1).m_plist_grid.SetFocus()
+                    return
+            # Eat...NOM NOM
+            elif event.GetKeyCode() == wx.WXK_UP:
                 return
-            elif event.GetKeyCode() == wx.WXK_DOWN:
-                if is_style:
-                    self.down_button_click(grid, event)
+            elif event.GetKeyCode() == wx.WXK_UP:
                 return
             elif event.GetKeyCode() == wx.WXK_LEFT:
                 return
             elif event.GetKeyCode() == wx.WXK_RIGHT:
                 return
-            elif event.GetKeyCode() == 0x49:
+        elif sys.platform == "darwin" and event.ControlDown():  # and not event.RawControlDown() and not event.AltDown():
+            # Insert Row
+            if not event.ShiftDown() and event.GetKeyCode() == 0x49:
                 self.insert_row_before(grid, event)
                 return
-            elif event.GetKeyCode() == 0x46:
-                if event.ShiftDown():
-                    grid.GetParent().GetParent().GetParent().GetParent().find_prev()
-                else:
-                    grid.GetParent().GetParent().GetParent().GetParent().find_next()
+        elif not sys.platform == "darwin" and event.RawControlDown() and not event.ControlDown() and not event.AltDown():
+            # Insert Row
+            if not event.ShiftDown() and event.GetKeyCode() == 0x49:
+                self.insert_row_before(grid, event)
                 return
-        if event.ControlDown() or event.ShiftDown():
+        # Eat...NOM NOM
+        elif event.RawControlDown() or event.ShiftDown():
             if event.GetKeyCode() == wx.WXK_UP:
                 return
             elif event.GetKeyCode() == wx.WXK_DOWN:
@@ -844,8 +906,42 @@ class ColorEditor(editor.ColorSetting):
 # Editor Dialog
 #################################################
 class Editor(editor.EditorFrame):
-    def __init__(self, parent, scheme, j_file, t_file):
+    def __init__(self, parent, scheme, j_file, t_file, debugging=False):
         super(Editor, self).__init__(parent)
+        findid = wx.NewId()
+        findnextid = wx.NewId()
+        findprevid = wx.NewId()
+        saveid = wx.NewId()
+        scid = wx.NewId()
+        if debugging:
+            debugid= wx.NewId()
+            self.Bind(wx.EVT_MENU, self.on_debug_console, id=debugid)
+        self.Bind(wx.EVT_MENU, self.on_shortcuts, id=scid)
+        self.Bind(wx.EVT_MENU, self.on_save_as, id=saveid)
+        self.Bind(wx.EVT_MENU, self.focus_find, id=findid)
+        self.Bind(wx.EVT_MENU, self.on_next_find, id=findnextid)
+        self.Bind(wx.EVT_MENU, self.on_prev_find, id=findprevid)
+        if sys.platform == "darwin":
+            accel_tbl = wx.AcceleratorTable(
+                [
+                    (wx.ACCEL_CMD, ord('B'), scid),
+                    (wx.ACCEL_CMD, ord('S'), saveid),
+                    (wx.ACCEL_CMD,  ord('F'), findid ),
+                    (wx.ACCEL_CMD, ord('G'), findnextid),
+                    (wx.ACCEL_CMD|wx.ACCEL_SHIFT, ord('G'), findprevid)
+                ] + ([(wx.ACCEL_CMD, ord('`'), debugid)] if debugging else [])
+            )
+        else:
+            accel_tbl = wx.AcceleratorTable(
+                [
+                    (wx.ACCEL_CTRL, ord('B'), scid),
+                    (wx.ACCEL_CTRL, ord('S'), saveid),
+                    (wx.ACCEL_CTRL,  ord('F'), findid ),
+                    (wx.ACCEL_CTRL, ord('G'), findnextid),
+                    (wx.ACCEL_CTRL|wx.ACCEL_SHIFT, ord('G'), findprevid)
+                ]  + ([(wx.ACCEL_CTRL, ord('`'), debugid)] if debugging else [])
+            )
+        self.SetAcceleratorTable(accel_tbl)
         self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
         self.search_results = []
         self.cur_search = None
@@ -854,6 +950,7 @@ class Editor(editor.EditorFrame):
         self.scheme = scheme
         self.json = j_file
         self.tmtheme = t_file
+        log.debug(scheme, fmt=lambda x: json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')))
         self.m_global_settings = GlobalSettings(self.m_plist_notebook, scheme, self.rebuild_plist, self.rebuild_tables)
         self.m_style_settings = StyleSettings(self.m_plist_notebook, scheme, self.rebuild_plist)
 
@@ -898,6 +995,7 @@ class Editor(editor.EditorFrame):
                 obj["settings"]["fontStyle"] = fontstyle
 
             self.scheme["settings"].append(obj)
+
         self.save()
 
     def save(self):
@@ -905,12 +1003,14 @@ class Editor(editor.EditorFrame):
             with codec_open(self.json, "w", "utf-8") as f:
                 f.write((json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
         except:
+            log.debug("JSON file write error!")
             error('Unexpected problem trying to write .tmTheme.JSON file!')
 
         try:
             with codec_open(self.tmtheme, "w", "utf-8") as f:
                 f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
         except:
+            log.debug("tmTheme file write error!")
             error('Unexpected problem trying to write .tmTheme file!')
 
     def rebuild_tables(self, cur_row, cur_col):
@@ -961,6 +1061,7 @@ class Editor(editor.EditorFrame):
                 self.update_plist()
         except:
             self.on_uuid_button_click(event)
+            log.debug("UUID invalid %s!" % self.m_plist_uuid_textbox.GetValue())
             error('UUID is invalid! A new UUID has been generated.')
 
     def set_style_object(self, obj):
@@ -968,6 +1069,10 @@ class Editor(editor.EditorFrame):
 
     def set_global_object(self, key, value):
         self.m_global_settings.set_object(key, value)
+
+    def focus_find(self, event):
+        self.m_search_panel.SetFocus()
+        event.Skip()
 
     def find(self):
         self.search_results = []
@@ -980,7 +1085,7 @@ class Editor(editor.EditorFrame):
                 if pattern in grid.GetCellValue(r, c).lower():
                     self.search_results.append((r, c))
 
-    def find_next(self):
+    def find_next(self, current=False):
         panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
         if self.cur_search is not panel:
             self.find()
@@ -989,7 +1094,10 @@ class Editor(editor.EditorFrame):
         col = grid.GetGridCursorCol()
         next = None
         for i in self.search_results:
-            if row == i[0] and col < i[1]:
+            if current and row == i[0] and col == i[i]:
+                next = i
+                break
+            elif row == i[0] and col < i[1]:
                 next = i
                 break
             elif row < i[0]:
@@ -1000,7 +1108,8 @@ class Editor(editor.EditorFrame):
         if next is not None:
             grid.SetFocus()
             panel.go_cell(grid, next[0], next[1], True)
-    def find_prev(self):
+
+    def find_prev(self, current=False):
         panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
         if self.cur_search is not panel:
             self.find()
@@ -1009,7 +1118,10 @@ class Editor(editor.EditorFrame):
         col = grid.GetGridCursorCol()
         prev = None
         for i in reversed(self.search_results):
-            if row == i[0] and col > i[1]:
+            if current and row == i[0] and col == i[i]:
+                prev = i
+                break
+            elif row == i[0] and col > i[1]:
                 prev = i
                 break
             elif row > i[0]:
@@ -1061,7 +1173,6 @@ class Editor(editor.EditorFrame):
             self.tmtheme = t_file
             self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
             self.save()
-        event.Skip()
 
     def on_about(self, event):
         info("Color Scheme Editor: version %s" % __version__)
@@ -1072,15 +1183,29 @@ class Editor(editor.EditorFrame):
         event.Skip()
 
     def on_find_finish(self, event):
-        self.find_next()
+        self.find_next(current=True)
 
     def on_next_find(self, event):
         self.find_next()
-        event.Skip()
 
     def on_prev_find(self, event):
         self.find_prev()
-        event.Skip()
+
+    def on_shortcuts(self, event):
+        msg = SHORTCUTS["osx"] if sys.platform == "darwin" else SHORTCUTS["windows"]
+        info(msg,"Shortcuts")
+
+    def on_debug_console(self, event):
+        global DEBUG_CONSOLE
+        DEBUG_CONSOLE = not DEBUG_CONSOLE
+        if DEBUG_CONSOLE:
+            log.set_echo(True)
+            log.debug("**Debug Console Opened**")
+        else:
+            log.debug("**Debug Console Closed**")
+            log.set_echo(False)
+            if app.stdioWin is not None:
+                app.stdioWin.close()
 
 
 #################################################
@@ -1140,15 +1265,17 @@ def query_user_for_file(action):
                 log.debug(result)
                 if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
                     error("File must be of type '.tmtheme' or '.tmtheme.json'")
+                    log.debug("Select: Bad extension: %s" % result)
                     continue
                 file_path = result
-                log.debug("File selectd: %s" % file_path)
+                log.debug("Select: File selected: %s" % file_path)
             done = True
         else:
             result = filepicker(None, "Theme file to save:", wildcard, True)
             if result is not None:
                 if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
                     error("File must be of type '.tmtheme' or '.tmtheme.json'")
+                    log.debug("New: Bad extension: %s" % result)
                     continue
                 if result.lower().endswith("tmtheme.json"):
                     with codec_open(result, "w", "utf-8") as f:
@@ -1157,7 +1284,7 @@ def query_user_for_file(action):
                     with codec_open(result, "w", "utf-8") as f:
                         f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
                 file_path = result
-                log.debug("File selectd: %s" % file_path)
+                log.debug("New: File selected: %s" % file_path)
             done = True
     return file_path
 
@@ -1171,14 +1298,16 @@ def parse_file(file_path):
         with open(file_path, "r") as f:
             color_scheme = json.loads(sanitize_json(f.read(), True)) if is_json else readPlist(f)
     except:
+        log.debug("Parse theme error!")
         error('Unexpected problem trying to parse file!')
 
-    if is_json:
-        j_file = file_path
-        t_file = file_path[:-5]
-    else:
-        j_file = file_path + ".JSON"
-        t_file = file_path
+    if color_scheme is not None:
+        if is_json:
+            j_file = file_path
+            t_file = file_path[:-5]
+        else:
+            j_file = file_path + ".JSON"
+            t_file = file_path
 
     return j_file, t_file, color_scheme
 
@@ -1203,6 +1332,7 @@ def parse_arguments(script):
 #################################################
 def main(script):
     global log
+    global app
     cs = None
     j_file = None
     t_file = None
@@ -1230,7 +1360,7 @@ def main(script):
         j_file, t_file, cs = parse_file(args.file)
 
     if j_file is not None and t_file is not None:
-        main_win = Editor(None, cs, j_file, t_file)
+        main_win = Editor(None, cs, j_file, t_file, debugging=args.debug)
         main_win.Show()
         app.MainLoop()
 
