@@ -13,8 +13,7 @@ import wx
 import editor
 from _lib.rgba import RGBA
 import uuid
-from os.path import exists, normpath, join, dirname, abspath
-from os import remove
+from os.path import exists, normpath, join, dirname, abspath, basename
 import _lib.simplelog as Log
 from _lib.default_new_theme import theme as default_new_theme
 
@@ -62,8 +61,8 @@ class CustomApp(wx.App):
 # Grid Helper Class
 #################################################
 class GridHelper(object):
-    cell_select_semiphore = False
-    range_semiphore = False
+    cell_select_semaphore = False
+    range_semaphore = False
     current_row = None
     current_col = None
 
@@ -81,12 +80,12 @@ class GridHelper(object):
         grid.SetCellHighlightColour(bg)
 
     def grid_select_cell(self, grid, event):
-        if not self.cell_select_semiphore and event.Selecting():
-            self.cell_select_semiphore = True
+        if not self.cell_select_semaphore and event.Selecting():
+            self.cell_select_semaphore = True
             self.current_row = event.GetRow()
             self.current_col = event.GetCol()
             self.go_cell(grid, self.current_row, self.current_col)
-            self.cell_select_semiphore = False
+            self.cell_select_semaphore = False
 
     def grid_range_select(self, grid, event):
         r1 = event.GetTopRow()
@@ -94,20 +93,20 @@ class GridHelper(object):
         c1 = event.GetLeftCol()
         c2 = event.GetRightCol()
         rows = len(grid.GetSelectedRows())
-        if self.cell_select_semiphore:
+        if self.cell_select_semaphore:
             pass
-        elif not self.range_semiphore and (r1 != r2 or c1 != c2):
+        elif not self.range_semaphore and (r1 != r2 or c1 != c2):
             if event.Selecting():
-                self.range_semiphore = True
+                self.range_semaphore = True
                 grid.ClearSelection()
                 if self.current_row is not None and self.current_col:
                     self.go_cell(grid, self.current_row, self.current_col)
-                self.range_semiphore = False
+                self.range_semaphore = False
             elif rows == 0:
                 if self.current_row is not None:
-                    self.range_semiphore = True
+                    self.range_semaphore = True
                     self.go_cell(grid, self.current_row, self.current_col)
-                    self.range_semiphore = False
+                    self.range_semaphore = False
         else:
             event.Skip()
 
@@ -148,6 +147,12 @@ class GridHelper(object):
                 return
             elif event.GetKeyCode() == 0x49:
                 self.insert_row_before(grid, event)
+                return
+            elif event.GetKeyCode() == 0x46:
+                if event.ShiftDown():
+                    grid.GetParent().GetParent().GetParent().GetParent().find_prev()
+                else:
+                    grid.GetParent().GetParent().GetParent().GetParent().find_next()
                 return
         if event.ControlDown() or event.ShiftDown():
             if event.GetKeyCode() == wx.WXK_UP:
@@ -841,7 +846,9 @@ class ColorEditor(editor.ColorSetting):
 class Editor(editor.EditorFrame):
     def __init__(self, parent, scheme, j_file, t_file):
         super(Editor, self).__init__(parent)
-        self.SetTitle("Color Scheme Editor %s" % __version__)
+        self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
+        self.search_results = []
+        self.cur_search = None
         self.last_UUID = None
         self.last_plist_name = None
         self.scheme = scheme
@@ -891,7 +898,9 @@ class Editor(editor.EditorFrame):
                 obj["settings"]["fontStyle"] = fontstyle
 
             self.scheme["settings"].append(obj)
+        self.save()
 
+    def save(self):
         try:
             with codec_open(self.json, "w", "utf-8") as f:
                 f.write((json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
@@ -960,6 +969,58 @@ class Editor(editor.EditorFrame):
     def set_global_object(self, key, value):
         self.m_global_settings.set_object(key, value)
 
+    def find(self):
+        self.search_results = []
+        pattern = self.m_search_panel.GetValue().lower()
+        panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
+        self.cur_search = panel
+        grid = panel.m_plist_grid
+        for r in range(0, grid.GetNumberRows()):
+            for c in range(0, grid.GetNumberCols()):
+                if pattern in grid.GetCellValue(r, c).lower():
+                    self.search_results.append((r, c))
+
+    def find_next(self):
+        panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
+        if self.cur_search is not panel:
+            self.find()
+        grid = panel.m_plist_grid
+        row = grid.GetGridCursorRow()
+        col = grid.GetGridCursorCol()
+        next = None
+        for i in self.search_results:
+            if row == i[0] and col < i[1]:
+                next = i
+                break
+            elif row < i[0]:
+                next = i
+                break
+        if next is None and len(self.search_results):
+            next = self.search_results[0]
+        if next is not None:
+            grid.SetFocus()
+            panel.go_cell(grid, next[0], next[1], True)
+    def find_prev(self):
+        panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
+        if self.cur_search is not panel:
+            self.find()
+        grid = panel.m_plist_grid
+        row = grid.GetGridCursorRow()
+        col = grid.GetGridCursorCol()
+        prev = None
+        for i in reversed(self.search_results):
+            if row == i[0] and col > i[1]:
+                prev = i
+                break
+            elif row > i[0]:
+                prev = i
+                break
+        if prev is None and len(self.search_results):
+            prev = self.search_results[-1]
+        if prev is not None:
+            grid.SetFocus()
+            panel.go_cell(grid, prev[0], prev[1], True)
+
     def on_plist_notebook_size(self, event):
         nb_size = self.m_plist_notebook.GetSize()
         grid = self.m_global_settings.m_plist_grid
@@ -982,6 +1043,43 @@ class Editor(editor.EditorFrame):
         if delta > 0:
             grid.SetColSize(4, grid.GetColSize(4) + delta)
         grid.EndBatch()
+        event.Skip()
+
+    def on_save_as(self, event):
+        save_file = query_user_for_file(action="new")
+        if save_file is not None:
+            j_file = None
+            t_file = None
+            is_json = file_path.lower().endswith("tmtheme.json")
+            if is_json:
+                j_file = file_path
+                t_file = file_path[:-5]
+            else:
+                j_file = file_path + ".JSON"
+                t_file = file_path
+            self.json = j_file
+            self.tmtheme = t_file
+            self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
+            self.save()
+        event.Skip()
+
+    def on_about(self, event):
+        info("Color Scheme Editor: version %s" % __version__)
+        event.Skip()
+
+    def on_find(self, event):
+        self.find()
+        event.Skip()
+
+    def on_find_finish(self, event):
+        self.find_next()
+
+    def on_next_find(self, event):
+        self.find_next()
+        event.Skip()
+
+    def on_prev_find(self, event):
+        self.find_prev()
         event.Skip()
 
 
@@ -1010,15 +1108,21 @@ def yesno(parent, question, caption = 'Yes or no?', yes="Okay", no="Cancel"):
     return result
 
 
-def error(msg):
-    wx.MessageBox(msg, 'ERROR', wx.OK | wx.ICON_ERROR)
+def info(msg, title="INFO"):
+    wx.MessageBox(msg, title, wx.OK | wx.ICON_INFORMATION)
+
+
+def error(msg, title="ERROR"):
+    wx.MessageBox(msg, title, wx.OK | wx.ICON_ERROR)
 
 
 #################################################
 # Helper Functions
 #################################################
-def query_user_for_file(select_file, new_file):
+def query_user_for_file(action):
     file_path = None
+    select_file = action == "select"
+    new_file = action == "new"
     select = False
     done = False
     if sys.platform == "darwin":
@@ -1115,7 +1219,12 @@ def main(script):
     app = CustomApp(redirect=True)
 
     if args.file is None:
-        args.file = query_user_for_file(args.select, args.new)
+        action = ""
+        if args.select:
+            action = "select"
+        elif args.new:
+            action = "new"
+        args.file = query_user_for_file(action)
 
     if args.file is not None:
         j_file, t_file, cs = parse_file(args.file)
