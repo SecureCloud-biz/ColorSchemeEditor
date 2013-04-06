@@ -30,7 +30,7 @@ SHORTCUTS = {
 Find Next: ⌘ + F
 Find Next: ⌘ + G
 Find Prev: ⌘ + ⇧ + G
-Save As: ⌘ + S
+Save As: ⌘ + ⇧ + S
 
 ===Table Shortcuts===
 Edit Row: Enter
@@ -950,26 +950,16 @@ class Editor(editor.EditorFrame):
         self.Bind(wx.EVT_MENU, self.focus_find, id=findid)
         self.Bind(wx.EVT_MENU, self.on_next_find, id=findnextid)
         self.Bind(wx.EVT_MENU, self.on_prev_find, id=findprevid)
-        if sys.platform == "darwin":
-            accel_tbl = wx.AcceleratorTable(
-                [
-                    (wx.ACCEL_CMD, ord('B'), scid),
-                    (wx.ACCEL_CMD, ord('S'), saveid),
-                    (wx.ACCEL_CMD,  ord('F'), findid ),
-                    (wx.ACCEL_CMD, ord('G'), findnextid),
-                    (wx.ACCEL_CMD|wx.ACCEL_SHIFT, ord('G'), findprevid)
-                ] + ([(wx.ACCEL_CMD, ord('`'), debugid)] if debugging else [])
-            )
-        else:
-            accel_tbl = wx.AcceleratorTable(
-                [
-                    (wx.ACCEL_CTRL, ord('B'), scid),
-                    (wx.ACCEL_CTRL, ord('S'), saveid),
-                    (wx.ACCEL_CTRL,  ord('F'), findid ),
-                    (wx.ACCEL_CTRL, ord('G'), findnextid),
-                    (wx.ACCEL_CTRL|wx.ACCEL_SHIFT, ord('G'), findprevid)
-                ]  + ([(wx.ACCEL_CTRL, ord('`'), debugid)] if debugging else [])
-            )
+        mod = wx.ACCEL_CMD if sys.platform == "darwin" else wx.ACCEL_CTRL
+        accel_tbl = wx.AcceleratorTable(
+            [
+                (mod, ord('B'), scid),
+                (mod|wx.ACCEL_SHIFT, ord('S'), saveid),
+                (mod,  ord('F'), findid ),
+                (mod, ord('G'), findnextid),
+                (mod|wx.ACCEL_SHIFT, ord('G'), findprevid)
+            ] + ([(mod, ord('`'), debugid)] if debugging else [])
+        )
         self.SetAcceleratorTable(accel_tbl)
         self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
         self.search_results = []
