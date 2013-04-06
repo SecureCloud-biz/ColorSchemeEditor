@@ -25,7 +25,7 @@ FG_COLOR = None
 DEBUG_CONSOLE = False
 
 SHORTCUTS = {
-    "osx": '''
+    "osx": u'''
 ===Applicatioon Shortcuts===
 Find Next: ⌘ + F
 Find Next: ⌘ + G
@@ -42,21 +42,21 @@ Delete Row: ⌫
 Insert Row: ⌘ + I
 ''',
 
-    "windows": '''
+    "windows": u'''
 ===Applicatioon Shortcuts===
-Find Next: ^ + F
-Find Next: ^ + G
-Find Prev: ^ + ⇧ + G
-Save As: ^ + S
+Find Next: Control + F
+Find Next: Control + G
+Find Prev: Control + Shift + G
+Save As: Control + S
 
 ===Table Shortcuts===
 Edit Row: Enter
-Move Row Up (Style Settings): ⌥ + ↑
-Move Row Down (Style Settings): ⌥ + ↓
-Switch to Global Settings: ⌥ + ←
-Switch to Style Settings: ⌥ + →
-Delete Row: ⌫
-Insert Row: ^ + I
+Move Row Up (Style Settings): Alt + ↑
+Move Row Down (Style Settings): Alt + ↓
+Switch to Global Settings: Alt + ←
+Switch to Style Settings: Alt + →
+Delete Row: Delete
+Insert Row: Control + I
 '''
 }
 
@@ -107,6 +107,35 @@ class GridHelper(object):
     current_row = None
     current_col = None
 
+    def setup_keybindings(self):
+        deleteid = wx.NewId()
+        insertid = wx.NewId()
+        panellid = wx.NewId()
+        panelrid = wx.NewId()
+        editid = wx.NewId()
+        rowupid = wx.NewId()
+        rowdownid = wx.NewId()
+
+        self.Bind(wx.EVT_MENU, self.on_delete_row, id=deleteid)
+        self.Bind(wx.EVT_MENU, self.on_insert_row, id=insertid)
+        self.Bind(wx.EVT_MENU, self.on_panel_left, id=panellid)
+        self.Bind(wx.EVT_MENU, self.on_panel_right, id=panelrid)
+        self.Bind(wx.EVT_MENU, self.on_row_up, id=rowupid)
+        self.Bind(wx.EVT_MENU, self.on_row_down, id=rowdownid)
+        self.Bind(wx.EVT_MENU, self.on_edit_cell, id=editid)
+
+        accel_tbl = wx.AcceleratorTable(
+            [
+                (wx.ACCEL_NORMAL, wx.WXK_RETURN, editid),
+                (wx.ACCEL_NORMAL, wx.WXK_DELETE, deleteid),
+                (wx.ACCEL_ALT, wx.WXK_LEFT, panellid ),
+                (wx.ACCEL_ALT, wx.WXK_RIGHT, panelrid),
+                (wx.ACCEL_ALT, wx.WXK_UP, rowupid ),
+                (wx.ACCEL_ALT, wx.WXK_DOWN, rowdownid)
+            ] + ([(wx.ACCEL_CMD, ord('I'), insertid )] if sys.platform == "darwin" else [(wx.ACCEL_CTRL, ord('I'), insertid )])
+        )
+        self.SetAcceleratorTable(accel_tbl)
+
     def go_cell(self, grid, row, col, focus=False):
         if focus:
             grid.GoToCell(row, col)
@@ -120,15 +149,8 @@ class GridHelper(object):
             bg.Set(255, 255, 255)
         grid.SetCellHighlightColour(bg)
 
-    def grid_select_cell(self, grid, event):
-        if not self.cell_select_semaphore and event.Selecting():
-            self.cell_select_semaphore = True
-            self.current_row = event.GetRow()
-            self.current_col = event.GetCol()
-            self.go_cell(grid, self.current_row, self.current_col)
-            self.cell_select_semaphore = False
-
-    def grid_range_select(self, grid, event):
+    def on_grid_range_select(self, event):
+        grid = self.m_plist_grid
         r1 = event.GetTopRow()
         r2 = event.GetBottomRow()
         c1 = event.GetLeftCol()
@@ -157,47 +179,10 @@ class GridHelper(object):
         else:
             event.Skip()           # no dragging, pass on to the window
 
-    def grid_key_down(self, grid, event):
-        is_style = isinstance(grid.GetParent(), StyleSettings)
-        if (
-            not event.HasModifiers() and
-            not event.MetaDown() and
-            not event.ShiftDown()
-        ):
-            # Delete Row
-            if event.GetKeyCode() == wx.WXK_DELETE:
-                self.delete_row(grid, event)
-                return
-            # Edit Row
-            elif event.GetKeyCode() == wx.WXK_RETURN:
-                if isinstance(grid.GetParent(), StyleSettings):
-                    grid.GetParent().edit_style(grid)
-                else:
-                    grid.GetParent().edit_global(grid)
-                return
-        elif event.AltDown():
-            # Move Column
-            if not event.ControlDown() and not event.ShiftDown() and not event.RawControlDown():
-                # Move Up
-                if event.GetKeyCode() == wx.WXK_UP:
-                    if is_style:
-                        self.up_button_click(grid, event)
-                    return
-                # Move Down
-                elif event.GetKeyCode() == wx.WXK_DOWN:
-                    if is_style:
-                        self.down_button_click(grid, event)
-                    return
-                elif event.GetKeyCode() == wx.WXK_LEFT:
-                    grid.GetParent().GetParent().ChangeSelection(0)
-                    grid.GetParent().GetParent().GetPage(0).m_plist_grid.SetFocus()
-                    return
-                elif event.GetKeyCode() == wx.WXK_RIGHT:
-                    grid.GetParent().GetParent().ChangeSelection(1)
-                    grid.GetParent().GetParent().GetPage(1).m_plist_grid.SetFocus()
-                    return
+    def grid_key_down(self, event):
+        if event.AltDown():
             # Eat...NOM NOM
-            elif event.GetKeyCode() == wx.WXK_UP:
+            if event.GetKeyCode() == wx.WXK_UP:
                 return
             elif event.GetKeyCode() == wx.WXK_UP:
                 return
@@ -205,18 +190,8 @@ class GridHelper(object):
                 return
             elif event.GetKeyCode() == wx.WXK_RIGHT:
                 return
-        elif sys.platform == "darwin" and event.ControlDown():  # and not event.RawControlDown() and not event.AltDown():
-            # Insert Row
-            if not event.ShiftDown() and event.GetKeyCode() == 0x49:
-                self.insert_row_before(grid, event)
-                return
-        elif not sys.platform == "darwin" and event.RawControlDown() and not event.ControlDown() and not event.AltDown():
-            # Insert Row
-            if not event.ShiftDown() and event.GetKeyCode() == 0x49:
-                self.insert_row_before(grid, event)
-                return
-        # Eat...NOM NOM
-        elif event.RawControlDown() or event.ShiftDown():
+        elif event.ShiftDown():
+            # Eat...NOM NOM
             if event.GetKeyCode() == wx.WXK_UP:
                 return
             elif event.GetKeyCode() == wx.WXK_DOWN:
@@ -227,117 +202,54 @@ class GridHelper(object):
                 return
         event.Skip()
 
-    def up_button_click( self, grid, event ):
-        row = grid.GetGridCursorRow()
-        col = grid.GetGridCursorCol()
-        if row > 0:
-            text = [grid.GetCellValue(row, x) for x in range(0, 5)]
-            bg = [grid.GetCellBackgroundColour(row, x) for x in range(0, 5)]
-            fg = [grid.GetCellTextColour(row, x) for x in range(0, 5)]
-            font = [grid.GetCellFont(row, x) for x in range(0, 5)]
-            grid.DeleteRows(row, 1, False)
-            grid.InsertRows(row - 1, 1, True)
-            [grid.SetCellValue(row - 1, x, text[x]) for x in range(0, 5)]
-            [grid.SetCellBackgroundColour(row - 1, x, bg[x]) for x in range(0, 5)]
-            [grid.SetCellTextColour(row - 1, x, fg[x]) for x in range(0, 5)]
-            [grid.SetCellFont(row - 1, x, font[x]) for x in range(0, 5)]
-            grid.GetParent().rebuild()
-        grid.SetFocus()
-        event.Skip()
+    def on_panel_left(self, event):
+        grid = self.m_plist_grid
+        grid.GetParent().GetParent().ChangeSelection(0)
+        grid.GetParent().GetParent().GetPage(0).m_plist_grid.SetFocus()
 
-    def down_button_click( self, grid, event ):
-        row = grid.GetGridCursorRow()
-        col = grid.GetGridCursorCol()
-        if row < grid.GetNumberRows() - 1:
-            text = [grid.GetCellValue(row, x) for x in range(0, 5)]
-            bg = [grid.GetCellBackgroundColour(row, x) for x in range(0, 5)]
-            fg = [grid.GetCellTextColour(row, x) for x in range(0, 5)]
-            font = [grid.GetCellFont(row, x) for x in range(0, 5)]
-            grid.DeleteRows(row, 1, False)
-            grid.InsertRows(row + 1, 1, True)
-            [grid.SetCellValue(row + 1, x, text[x]) for x in range(0, 5)]
-            [grid.SetCellBackgroundColour(row + 1, x, bg[x]) for x in range(0, 5)]
-            [grid.SetCellTextColour(row + 1, x, fg[x]) for x in range(0, 5)]
-            [grid.SetCellFont(row + 1, x, font[x]) for x in range(0, 5)]
-            grid.GetParent().rebuild()
-        grid.SetFocus()
-        event.Skip()
+    def on_panel_right(self, event):
+        grid = self.m_plist_grid
+        grid.GetParent().GetParent().ChangeSelection(1)
+        grid.GetParent().GetParent().GetPage(1).m_plist_grid.SetFocus()
 
-    def edit_style(self, grid):
-        row = grid.GetGridCursorRow()
-        ColorEditor(
-            wx.GetApp().TopWindow,
-            {
-                "name": grid.GetCellValue(row, 0),
-                "scope": grid.GetCellValue(row, 4),
-                "settings": {
-                    "foreground": grid.GetCellValue(row, 1),
-                    "background": grid.GetCellValue(row, 2),
-                    "fontStyle": grid.GetCellValue(row, 3)
-                }
-            }
-        ).Show()
+    def on_grid_select_cell(self, event):
+        grid = self.m_plist_grid
+        if not self.cell_select_semaphore and event.Selecting():
+            self.cell_select_semaphore = True
+            self.current_row = event.GetRow()
+            self.current_col = event.GetCol()
+            self.go_cell(grid, self.current_row, self.current_col)
+            self.cell_select_semaphore = False
 
-    def edit_global(self, grid):
-        row = grid.GetGridCursorRow()
-        GlobalEditor(
-            wx.GetApp().TopWindow,
-            grid.GetCellValue(row, 0),
-            grid.GetCellValue(row, 1)
-        ).Show()
+    def on_row_up(self, event):
+        self.row_up()
 
-    def insert_row_before(self, grid, event):
-        num = grid.GetNumberRows()
-        row = grid.GetGridCursorRow()
-        if num > 0:
-            grid.InsertRows(row, 1, True)
-        else:
-            grid.AppendRows(1)
-            row = 0
-        if isinstance(grid.GetParent(), StyleSettings):
-            text = ["New Item", "#FFFFFF", "#000000", "", "comment"]
-            [grid.SetCellValue(row, x, text[x]) for x in range(0, 5)]
-            obj = {
-                "name": text[0],
-                "scope": text[4],
-                "settings": {
-                    "foreground": text[1],
-                    "background": text[2],
-                    "fontStyle": text[3]
-                }
-            }
-            grid.GetParent().update_row(row, obj)
-            self.go_cell(grid, row, 0)
-            grid.GetParent().rebuild()
-            ColorEditor(
-                wx.GetApp().TopWindow,
-                obj
-            ).Show()
-        else:
-            text = ["new_item", "nothing"]
-            [grid.SetCellValue(row, x, text[x]) for x in range(0, 2)]
-            grid.GetParent().update_row(row, text[0], text[1])
-            self.go_cell(grid, row, 0)
-            grid.GetParent().rebuild()
-            GlobalEditor(
-                wx.GetApp().TopWindow,
-                text[0],
-                text[1]
-            ).Show()
+    def on_row_down(self, event):
+        self.row_down()
 
-    def delete_row(self, grid, event):
-        row = grid.GetGridCursorRow()
-        col = grid.GetGridCursorCol()
-        grid.DeleteRows(row, 1)
-        name = grid.GetCellValue(row, 0)
-        if (
-            isinstance(grid.GetParent(), GlobalSettings) and
-            (name == "foreground" or name == "background")
-        ):
-            grid.GetParent().reshow(row, col)
-        else:
-            grid.GetParent().rebuild()
+    def on_insert_row(self, event):
+        self.insert_row()
 
+    def on_delete_row(self, event):
+        self.delete_row()
+
+    def on_edit_cell_key(self, event):
+        self.edit_cell()
+
+    def row_up(self):
+        pass
+
+    def row_down(self):
+        pass
+
+    def edit_cell(self):
+        pass
+
+    def delete_row(self):
+        pass
+
+    def insert_row(self):
+        pass
 
 #################################################
 # Grid Display Panels
@@ -345,6 +257,7 @@ class GridHelper(object):
 class StyleSettings(editor.StyleSettingsPanel, GridHelper):
     def __init__(self, parent, scheme, rebuild):
         super(StyleSettings, self).__init__(parent)
+        self.setup_keybindings()
         self.parent = parent
         wx.EVT_MOTION(self.m_plist_grid.GetGridWindow(), self.on_mouse_motion)
         self.m_plist_grid.SetDefaultCellBackgroundColour(self.GetBackgroundColour())
@@ -458,25 +371,108 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
             self.m_plist_grid.SetColSize(4, self.m_plist_grid.GetColSize(4) + delta)
         self.m_plist_grid.EndBatch()
 
-    def on_grid_select_cell(self, event):
-        self.grid_select_cell(self.m_plist_grid, event)
-
-    def on_grid_range_select(self, event):
-        self.grid_range_select(self.m_plist_grid, event)
-
     def on_mouse_motion(self, event):
         self.mouse_motion(event)
 
-    def on_grid_key_down(self, event):
-        self.grid_key_down(self.m_plist_grid, event)
-
     def on_edit_cell(self, event):
-        self.edit_style(self.m_plist_grid)
+        self.edit_cell()
 
+    def edit_cell(self):
+        grid = self.m_plist_grid
+        row = grid.GetGridCursorRow()
+        ColorEditor(
+            wx.GetApp().TopWindow,
+            {
+                "name": grid.GetCellValue(row, 0),
+                "scope": grid.GetCellValue(row, 4),
+                "settings": {
+                    "foreground": grid.GetCellValue(row, 1),
+                    "background": grid.GetCellValue(row, 2),
+                    "fontStyle": grid.GetCellValue(row, 3)
+                }
+            }
+        ).Show()
+
+    def delete_row(self):
+        row = self.m_plist_grid.GetGridCursorRow()
+        col = self.m_plist_grid.GetGridCursorCol()
+        self.m_plist_grid.DeleteRows(row, 1)
+        name = self.m_plist_grid.GetCellValue(row, 0)
+        self.m_plist_grid.GetParent().rebuild()
+
+    def insert_row(self):
+        grid = self.m_plist_grid
+        num = grid.GetNumberRows()
+        row = grid.GetGridCursorRow()
+        if num > 0:
+            grid.InsertRows(row, 1, True)
+        else:
+            grid.AppendRows(1)
+            row = 0
+        text = ["New Item", "#FFFFFF", "#000000", "", "comment"]
+        [grid.SetCellValue(row, x, text[x]) for x in range(0, 5)]
+        obj = {
+            "name": text[0],
+            "scope": text[4],
+            "settings": {
+                "foreground": text[1],
+                "background": text[2],
+                "fontStyle": text[3]
+            }
+        }
+        grid.GetParent().update_row(row, obj)
+        self.go_cell(grid, row, 0)
+        grid.GetParent().rebuild()
+        ColorEditor(
+            wx.GetApp().TopWindow,
+            obj
+        ).Show()
+
+    def row_up(self):
+        grid = self.m_plist_grid
+        row = grid.GetGridCursorRow()
+        col = grid.GetGridCursorCol()
+        if row > 0:
+            text = [grid.GetCellValue(row, x) for x in range(0, 5)]
+            bg = [grid.GetCellBackgroundColour(row, x) for x in range(0, 5)]
+            fg = [grid.GetCellTextColour(row, x) for x in range(0, 5)]
+            font = [grid.GetCellFont(row, x) for x in range(0, 5)]
+            grid.DeleteRows(row, 1, False)
+            grid.InsertRows(row - 1, 1, True)
+            [grid.SetCellValue(row - 1, x, text[x]) for x in range(0, 5)]
+            [grid.SetCellBackgroundColour(row - 1, x, bg[x]) for x in range(0, 5)]
+            [grid.SetCellTextColour(row - 1, x, fg[x]) for x in range(0, 5)]
+            [grid.SetCellFont(row - 1, x, font[x]) for x in range(0, 5)]
+            self.go_cell(grid, row - 1, col)
+            grid.GetParent().rebuild()
+            grid.SetFocus()
+
+    def row_down(self):
+        grid = self.m_plist_grid
+        row = grid.GetGridCursorRow()
+        col = grid.GetGridCursorCol()
+        if row < grid.GetNumberRows() - 1:
+            text = [grid.GetCellValue(row, x) for x in range(0, 5)]
+            bg = [grid.GetCellBackgroundColour(row, x) for x in range(0, 5)]
+            fg = [grid.GetCellTextColour(row, x) for x in range(0, 5)]
+            font = [grid.GetCellFont(row, x) for x in range(0, 5)]
+            grid.DeleteRows(row, 1, False)
+            grid.InsertRows(row + 1, 1, True)
+            [grid.SetCellValue(row + 1, x, text[x]) for x in range(0, 5)]
+            [grid.SetCellBackgroundColour(row + 1, x, bg[x]) for x in range(0, 5)]
+            [grid.SetCellTextColour(row + 1, x, fg[x]) for x in range(0, 5)]
+            [grid.SetCellFont(row + 1, x, font[x]) for x in range(0, 5)]
+            self.go_cell(grid, row + 1, col)
+            grid.GetParent().rebuild()
+            grid.SetFocus()
+
+    def on_grid_key_down(self, event):
+        self.grid_key_down(event)
 
 class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
     def __init__(self, parent, scheme, rebuild, reshow):
         super(GlobalSettings, self).__init__(parent)
+        self.setup_keybindings()
         self.parent = parent
         wx.EVT_MOTION(self.m_plist_grid.GetGridWindow(), self.on_mouse_motion)
         self.m_plist_grid.SetDefaultCellBackgroundColour(self.GetBackgroundColour())
@@ -554,20 +550,53 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
             self.m_plist_grid.SetColSize(1, self.m_plist_grid.GetColSize(1) + delta)
         self.m_plist_grid.EndBatch()
 
-    def on_grid_select_cell( self, event ):
-        self.grid_select_cell(self.m_plist_grid, event)
-
-    def on_grid_range_select( self, event ):
-        self.grid_range_select(self.m_plist_grid, event)
-
     def on_mouse_motion(self, event):
         self.mouse_motion(event)
 
-    def on_grid_key_down( self, event ):
-        self.grid_key_down(self.m_plist_grid, event)
+    def delete_row(self):
+        row = self.m_plist_grid.GetGridCursorRow()
+        col = self.m_plist_grid.GetGridCursorCol()
+        self.m_plist_grid.DeleteRows(row, 1)
+        name = self.m_plist_grid.GetCellValue(row, 0)
+        if name == "foreground" or name == "background":
+            self.m_plist_grid.GetParent().reshow(row, col)
+        else:
+            self.m_plist_grid.GetParent().rebuild()
+
+    def insert_row(self):
+        grid = self.m_plist_grid
+        num = grid.GetNumberRows()
+        row = grid.GetGridCursorRow()
+        if num > 0:
+            grid.InsertRows(row, 1, True)
+        else:
+            grid.AppendRows(1)
+            row = 0
+        text = ["new_item", "nothing"]
+        [grid.SetCellValue(row, x, text[x]) for x in range(0, 2)]
+        grid.GetParent().update_row(row, text[0], text[1])
+        self.go_cell(grid, row, 0)
+        grid.GetParent().rebuild()
+        GlobalEditor(
+            wx.GetApp().TopWindow,
+            text[0],
+            text[1]
+        ).Show()
 
     def on_edit_cell(self, event):
-        self.edit_global(self.m_plist_grid)
+        self.edit_cell()
+
+    def edit_cell(self):
+        grid = self.m_plist_grid
+        row = grid.GetGridCursorRow()
+        GlobalEditor(
+            wx.GetApp().TopWindow,
+            grid.GetCellValue(row, 0),
+            grid.GetCellValue(row, 1)
+        ).Show()
+
+    def on_grid_key_down(self, event):
+        self.grid_key_down(event)
 
 
 #################################################
@@ -1088,13 +1117,14 @@ class Editor(editor.EditorFrame):
     def find_next(self, current=False):
         panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
         if self.cur_search is not panel:
+            log.debug("Find: Panel switched.  Upate results.")
             self.find()
         grid = panel.m_plist_grid
         row = grid.GetGridCursorRow()
         col = grid.GetGridCursorCol()
         next = None
         for i in self.search_results:
-            if current and row == i[0] and col == i[i]:
+            if current and row == i[0] and col == i[1]:
                 next = i
                 break
             elif row == i[0] and col < i[1]:
@@ -1112,13 +1142,14 @@ class Editor(editor.EditorFrame):
     def find_prev(self, current=False):
         panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
         if self.cur_search is not panel:
+            log.debug("Find: Panel switched.  Upate results.")
             self.find()
         grid = panel.m_plist_grid
         row = grid.GetGridCursorRow()
         col = grid.GetGridCursorCol()
         prev = None
         for i in reversed(self.search_results):
-            if current and row == i[0] and col == i[i]:
+            if current and row == i[0] and col == i[1]:
                 prev = i
                 break
             elif row == i[0] and col > i[1]:
@@ -1363,8 +1394,6 @@ def main(script):
         main_win = Editor(None, cs, j_file, t_file, debugging=args.debug)
         main_win.Show()
         app.MainLoop()
-
-    log.debug("Exiting")
     return 0
 
 
