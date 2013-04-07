@@ -60,6 +60,13 @@ Insert Row: Control + I
 '''
 }
 
+JSON_ADD = 1
+JSON_DELETE = 2
+JSON_MODIFY = 3
+JSON_MOVE = 4
+JSON_UUID = 5
+JSON_NAME = 6
+
 #################################################
 # Debug and Logging
 #################################################
@@ -149,30 +156,6 @@ class GridHelper(object):
             bg.Set(255, 255, 255)
         grid.SetCellHighlightColour(bg)
 
-    def on_grid_range_select(self, event):
-        grid = self.m_plist_grid
-        r1 = event.GetTopRow()
-        r2 = event.GetBottomRow()
-        c1 = event.GetLeftCol()
-        c2 = event.GetRightCol()
-        rows = len(grid.GetSelectedRows())
-        if self.cell_select_semaphore:
-            pass
-        elif not self.range_semaphore and (r1 != r2 or c1 != c2):
-            if event.Selecting():
-                self.range_semaphore = True
-                grid.ClearSelection()
-                if self.current_row is not None and self.current_col:
-                    self.go_cell(grid, self.current_row, self.current_col)
-                self.range_semaphore = False
-            elif rows == 0:
-                if self.current_row is not None:
-                    self.range_semaphore = True
-                    self.go_cell(grid, self.current_row, self.current_col)
-                    self.range_semaphore = False
-        else:
-            event.Skip()
-
     def mouse_motion(self, event):
         if event.Dragging():       # mouse being dragged?
             pass                   # eat the event
@@ -202,6 +185,15 @@ class GridHelper(object):
                 return
         event.Skip()
 
+    def grid_select_cell(self, event):
+        grid = self.m_plist_grid
+        if not self.cell_select_semaphore and event.Selecting():
+            self.cell_select_semaphore = True
+            self.current_row = event.GetRow()
+            self.current_col = event.GetCol()
+            self.go_cell(grid, self.current_row, self.current_col)
+            self.cell_select_semaphore = False
+
     def on_panel_left(self, event):
         grid = self.m_plist_grid
         grid.GetParent().GetParent().ChangeSelection(0)
@@ -211,15 +203,6 @@ class GridHelper(object):
         grid = self.m_plist_grid
         grid.GetParent().GetParent().ChangeSelection(1)
         grid.GetParent().GetParent().GetPage(1).m_plist_grid.SetFocus()
-
-    def on_grid_select_cell(self, event):
-        grid = self.m_plist_grid
-        if not self.cell_select_semaphore and event.Selecting():
-            self.cell_select_semaphore = True
-            self.current_row = event.GetRow()
-            self.current_col = event.GetCol()
-            self.go_cell(grid, self.current_row, self.current_col)
-            self.cell_select_semaphore = False
 
     def on_row_up(self, event):
         self.row_up()
@@ -255,14 +238,14 @@ class GridHelper(object):
 # Grid Display Panels
 #################################################
 class StyleSettings(editor.StyleSettingsPanel, GridHelper):
-    def __init__(self, parent, scheme, rebuild):
+    def __init__(self, parent, scheme, update):
         super(StyleSettings, self).__init__(parent)
         self.setup_keybindings()
         self.parent = parent
         wx.EVT_MOTION(self.m_plist_grid.GetGridWindow(), self.on_mouse_motion)
         self.m_plist_grid.SetDefaultCellBackgroundColour(self.GetBackgroundColour())
         self.read_plist(scheme)
-        self.rebuild = rebuild
+        self.update_plist = update
 
     def read_plist(self, scheme):
         foreground = RGBA(scheme["settings"][0]["settings"].get("foreground", "#000000"))
@@ -359,7 +342,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         row = self.m_plist_grid.GetGridCursorRow()
         col = self.m_plist_grid.GetGridCursorCol()
         self.update_row(row, obj)
-        self.rebuild()
+        self.update_plist(JSON_MODIFY, {"table": "style", "index": row, "data": obj})
         self.m_plist_grid.BeginBatch()
         nb_size = self.parent.GetSize()
         total_size = 0
@@ -370,12 +353,6 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         if delta > 0:
             self.m_plist_grid.SetColSize(4, self.m_plist_grid.GetColSize(4) + delta)
         self.m_plist_grid.EndBatch()
-
-    def on_mouse_motion(self, event):
-        self.mouse_motion(event)
-
-    def on_edit_cell(self, event):
-        self.edit_cell()
 
     def edit_cell(self):
         grid = self.m_plist_grid
@@ -398,7 +375,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         col = self.m_plist_grid.GetGridCursorCol()
         self.m_plist_grid.DeleteRows(row, 1)
         name = self.m_plist_grid.GetCellValue(row, 0)
-        self.m_plist_grid.GetParent().rebuild()
+        self.m_plist_grid.GetParent().update_plist(JSON_DELETE, {"table": "style", "index": row})
 
     def insert_row(self):
         grid = self.m_plist_grid
@@ -422,7 +399,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         }
         grid.GetParent().update_row(row, obj)
         self.go_cell(grid, row, 0)
-        grid.GetParent().rebuild()
+        grid.GetParent().update_plist(JSON_ADD, {"table": "style", "index": row, "data": obj})
         ColorEditor(
             wx.GetApp().TopWindow,
             obj
@@ -444,7 +421,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
             [grid.SetCellTextColour(row - 1, x, fg[x]) for x in range(0, 5)]
             [grid.SetCellFont(row - 1, x, font[x]) for x in range(0, 5)]
             self.go_cell(grid, row - 1, col)
-            grid.GetParent().rebuild()
+            grid.GetParent().update_plist(JSON_MOVE, {"from": row, "to": row - 1})
             grid.SetFocus()
 
     def row_down(self):
@@ -463,22 +440,32 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
             [grid.SetCellTextColour(row + 1, x, fg[x]) for x in range(0, 5)]
             [grid.SetCellFont(row + 1, x, font[x]) for x in range(0, 5)]
             self.go_cell(grid, row + 1, col)
-            grid.GetParent().rebuild()
+            grid.GetParent().update_plist(JSON_MOVE, {"from": row, "to": row + 1})
             grid.SetFocus()
+
+    def on_mouse_motion(self, event):
+        self.mouse_motion(event)
+
+    def on_edit_cell(self, event):
+        self.edit_cell()
 
     def on_grid_key_down(self, event):
         self.grid_key_down(event)
 
+    def on_grid_select_cell(self, event):
+        self.grid_select_cell(event)
+
+
 class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
-    def __init__(self, parent, scheme, rebuild, reshow):
+    def __init__(self, parent, scheme, update, reshow):
         super(GlobalSettings, self).__init__(parent)
         self.setup_keybindings()
         self.parent = parent
         wx.EVT_MOTION(self.m_plist_grid.GetGridWindow(), self.on_mouse_motion)
         self.m_plist_grid.SetDefaultCellBackgroundColour(self.GetBackgroundColour())
         self.read_plist(scheme)
-        self.rebuild = rebuild
         self.reshow = reshow
+        self.update_plist = update
 
     def read_plist(self, scheme):
         foreground = RGBA(scheme["settings"][0]["settings"].get("foreground", "#000000"))
@@ -535,10 +522,9 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         row = self.m_plist_grid.GetGridCursorRow()
         col = self.m_plist_grid.GetGridCursorCol()
         self.update_row(row, key, value)
+        self.update_plist(JSON_MODIFY, {"table": "global", "index": key, "data": value})
         if key == "background" or key == "foreground":
             self.reshow(row, col)
-        else:
-            self.rebuild()
         self.m_plist_grid.BeginBatch()
         nb_size = self.parent.GetSize()
         total_size = 0
@@ -550,18 +536,14 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
             self.m_plist_grid.SetColSize(1, self.m_plist_grid.GetColSize(1) + delta)
         self.m_plist_grid.EndBatch()
 
-    def on_mouse_motion(self, event):
-        self.mouse_motion(event)
-
     def delete_row(self):
         row = self.m_plist_grid.GetGridCursorRow()
         col = self.m_plist_grid.GetGridCursorCol()
-        self.m_plist_grid.DeleteRows(row, 1)
         name = self.m_plist_grid.GetCellValue(row, 0)
+        self.m_plist_grid.DeleteRows(row, 1)
+        self.m_plist_grid.GetParent().update_plist(JSON_DELETE, {"table": "global", "index": name})
         if name == "foreground" or name == "background":
             self.m_plist_grid.GetParent().reshow(row, col)
-        else:
-            self.m_plist_grid.GetParent().rebuild()
 
     def insert_row(self):
         grid = self.m_plist_grid
@@ -576,15 +558,12 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         [grid.SetCellValue(row, x, text[x]) for x in range(0, 2)]
         grid.GetParent().update_row(row, text[0], text[1])
         self.go_cell(grid, row, 0)
-        grid.GetParent().rebuild()
+        grid.GetParent().update_plist(JSON_ADD, {"table": "global", "index": text[0], "data": text[1]})
         GlobalEditor(
             wx.GetApp().TopWindow,
             text[0],
             text[1]
         ).Show()
-
-    def on_edit_cell(self, event):
-        self.edit_cell()
 
     def edit_cell(self):
         grid = self.m_plist_grid
@@ -595,8 +574,17 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
             grid.GetCellValue(row, 1)
         ).Show()
 
+    def on_mouse_motion(self, event):
+        self.mouse_motion(event)
+
+    def on_edit_cell(self, event):
+        self.edit_cell()
+
     def on_grid_key_down(self, event):
         self.grid_key_down(event)
+
+    def on_grid_select_cell(self, event):
+        self.grid_select_cell(event)
 
 
 #################################################
@@ -970,8 +958,14 @@ class Editor(editor.EditorFrame):
         self.json = j_file
         self.tmtheme = t_file
         log.debug(scheme, fmt=lambda x: json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')))
-        self.m_global_settings = GlobalSettings(self.m_plist_notebook, scheme, self.rebuild_plist, self.rebuild_tables)
-        self.m_style_settings = StyleSettings(self.m_plist_notebook, scheme, self.rebuild_plist)
+
+        try:
+            self.m_global_settings = GlobalSettings(self.m_plist_notebook, scheme, self.update_plist, self.rebuild_tables)
+            self.m_style_settings = StyleSettings(self.m_plist_notebook, scheme, self.update_plist)
+        except Exception as e:
+            log.debug("Failed to load scheme settings!")
+            log.debug(e)
+            raise
 
         self.m_plist_name_textbox.SetValue(scheme["name"])
         self.m_plist_uuid_textbox.SetValue(scheme["uuid"])
@@ -980,6 +974,59 @@ class Editor(editor.EditorFrame):
 
         self.m_plist_notebook.InsertPage(0, self.m_global_settings, "Global Settings", True)
         self.m_plist_notebook.InsertPage(1, self.m_style_settings, "Scope Settings", False)
+
+    def update_plist(self, code, args=None):
+        if code == JSON_UUID:
+            self.scheme["uuid"] = self.m_plist_uuid_textbox.GetValue()
+        elif code == JSON_NAME:
+            self.scheme["name"] = self.m_plist_name_textbox.GetValue()
+        elif code == JSON_ADD and args is not None:
+            log.debug("JSON add")
+            if args["table"] == "style":
+                self.scheme["settings"].insert(args["index"] + 1, args["data"])
+            else:
+                self.scheme["settings"][0]["settings"][args["index"]] = args["data"]
+        elif code == JSON_DELETE and args is not None:
+            log.debug("JSON delete")
+            if args["table"] == "style":
+                del self.scheme["settings"][args["index"] + 1]
+            else:
+                del self.scheme["settings"][0]["settings"][args["index"]]
+        elif code == JSON_MOVE and args is not None:
+            log.debug("JSON move")
+            from_row = args["from"] + 1
+            to_row = args["to"] + 1
+            item = self.scheme["settings"][from_row]
+            del self.scheme["settings"][from_row]
+            self.scheme["settings"].insert(to_row, item)
+        elif code == JSON_MODIFY and args is not None:
+            log.debug("JSON modify")
+            if args["table"] == "style":
+                obj = {
+                    "name": args["data"]["name"],
+                    "scope": args["data"]["scope"],
+                    "settings": {
+                    }
+                }
+
+                settings = args["data"]["settings"]
+
+                if settings["foreground"] != "":
+                    obj["settings"]["foreground"] = settings["foreground"]
+
+                if settings["background"] != "":
+                    obj["settings"]["background"] = settings["background"]
+
+                if settings["fontStyle"] != "":
+                    obj["settings"]["fontStyle"] = settings["fontStyle"]
+
+                self.scheme["settings"][args["index"] + 1] = obj
+            else:
+                self.scheme["settings"][0]["settings"][args["index"]] = args["data"]
+        else:
+            log.debug("No valid edit actions!")
+
+        self.save()
 
     def rebuild_plist(self):
         self.scheme["name"] = self.m_plist_name_textbox.GetValue()
@@ -1033,7 +1080,6 @@ class Editor(editor.EditorFrame):
             error('Unexpected problem trying to write .tmTheme file!')
 
     def rebuild_tables(self, cur_row, cur_col):
-        self.rebuild_plist()
         cur_page = self.m_plist_notebook.GetSelection()
 
         self.m_global_settings.m_plist_grid.DeleteRows(0, self.m_global_settings.m_plist_grid.GetNumberRows())
@@ -1052,36 +1098,6 @@ class Editor(editor.EditorFrame):
             self.m_plist_notebook.ChangeSelection(cur_page)
             if cur_row is not None and cur_col is not None:
                 self.m_style_settings.go_cell(self.m_style_settings.m_plist_grid, cur_row, cur_col, True)
-
-    def update_plist(self):
-        cur_page = self.m_plist_notebook.GetSelection()
-        grid = self.m_global_settings.m_plist_grid if cur_page == 0 else self.m_style_settings.m_plist_grid
-        row, col = grid.GetGridCursorRow(), grid.GetGridCursorCol()
-        self.rebuild_plist()
-
-    def on_plist_name_blur(self, event):
-        set_name = self.m_plist_name_textbox.GetValue()
-        if set_name != self.last_plist_name:
-            self.last_plist_name = set_name
-            self.update_plist()
-
-    def on_uuid_button_click(self, event):
-        self.last_UUID = str(uuid.uuid4()).upper()
-        self.m_plist_uuid_textbox.SetValue(self.last_UUID)
-        self.update_plist()
-        event.Skip()
-
-    def on_uuid_blur(self, event):
-        try:
-            set_uuid = self.m_plist_uuid_textbox.GetValue()
-            uuid.UUID(set_uuid)
-            if set_uuid != self.last_UUID:
-                self.last_UUID = set_uuid
-                self.update_plist()
-        except:
-            self.on_uuid_button_click(event)
-            log.debug("UUID invalid %s!" % self.m_plist_uuid_textbox.GetValue())
-            error('UUID is invalid! A new UUID has been generated.')
 
     def set_style_object(self, obj):
         self.m_style_settings.set_object(obj)
@@ -1153,6 +1169,30 @@ class Editor(editor.EditorFrame):
         if prev is not None:
             grid.SetFocus()
             panel.go_cell(grid, prev[0], prev[1], True)
+
+    def on_plist_name_blur(self, event):
+        set_name = self.m_plist_name_textbox.GetValue()
+        if set_name != self.last_plist_name:
+            self.last_plist_name = set_name
+            self.update_plist(JSON_NAME)
+
+    def on_uuid_button_click(self, event):
+        self.last_UUID = str(uuid.uuid4()).upper()
+        self.m_plist_uuid_textbox.SetValue(self.last_UUID)
+        self.update_plist(JSON_UUID)
+        event.Skip()
+
+    def on_uuid_blur(self, event):
+        try:
+            set_uuid = self.m_plist_uuid_textbox.GetValue()
+            uuid.UUID(set_uuid)
+            if set_uuid != self.last_UUID:
+                self.last_UUID = set_uuid
+                self.update_plist(JSON_UUID)
+        except:
+            self.on_uuid_button_click(event)
+            log.debug("UUID invalid %s!" % self.m_plist_uuid_textbox.GetValue())
+            error('UUID is invalid! A new UUID has been generated.')
 
     def on_plist_notebook_size(self, event):
         nb_size = self.m_plist_notebook.GetSize()
@@ -1227,6 +1267,17 @@ class Editor(editor.EditorFrame):
             log.set_echo(False)
             if app.stdioWin is not None:
                 app.stdioWin.close()
+
+    def on_close(self, event):
+        global DEBUG_CONSOLE
+        if DEBUG_CONSOLE:
+            log.debug("**Debug Console Closed**")
+            DEBUG_CONSOLE = False
+            log.set_echo(False)
+            if app.stdioWin is not None:
+                app.stdioWin.close()
+        event.Skip()
+
 
 
 #################################################

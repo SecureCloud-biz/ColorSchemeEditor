@@ -60,7 +60,7 @@
             <event name="OnAuiPaneRestore"></event>
             <event name="OnAuiRender"></event>
             <event name="OnChar"></event>
-            <event name="OnClose"></event>
+            <event name="OnClose">on_close</event>
             <event name="OnEnterWindow"></event>
             <event name="OnEraseBackground"></event>
             <event name="OnHibernate"></event>
@@ -1233,7 +1233,7 @@
                 </object>
             </object>
         </object>
-        <object class="Panel" expanded="0">
+        <object class="Panel" expanded="1">
             <property name="aui_managed">0</property>
             <property name="aui_manager_style">wxAUI_MGR_DEFAULT</property>
             <property name="bg">wxSYS_COLOUR_BTNFACE</property>
@@ -1285,7 +1285,7 @@
             <event name="OnSetFocus"></event>
             <event name="OnSize"></event>
             <event name="OnUpdateUI"></event>
-            <object class="wxBoxSizer" expanded="0">
+            <object class="wxBoxSizer" expanded="1">
                 <property name="minimum_size"></property>
                 <property name="name">bSizer1</property>
                 <property name="orient">wxVERTICAL</property>
@@ -1408,7 +1408,7 @@
                         <event name="OnGridLabelLeftDClick"></event>
                         <event name="OnGridLabelRightClick"></event>
                         <event name="OnGridLabelRightDClick"></event>
-                        <event name="OnGridRangeSelect">on_grid_range_select</event>
+                        <event name="OnGridRangeSelect"></event>
                         <event name="OnGridRowSize"></event>
                         <event name="OnGridSelectCell">on_grid_select_cell</event>
                         <event name="OnKeyDown">on_grid_key_down</event>
@@ -1435,7 +1435,7 @@
                 </object>
             </object>
         </object>
-        <object class="Panel" expanded="0">
+        <object class="Panel" expanded="1">
             <property name="aui_managed">0</property>
             <property name="aui_manager_style">wxAUI_MGR_DEFAULT</property>
             <property name="bg">wxSYS_COLOUR_BTNFACE</property>
@@ -1487,7 +1487,7 @@
             <event name="OnSetFocus"></event>
             <event name="OnSize"></event>
             <event name="OnUpdateUI"></event>
-            <object class="wxBoxSizer" expanded="0">
+            <object class="wxBoxSizer" expanded="1">
                 <property name="minimum_size"></property>
                 <property name="name">bSizer1</property>
                 <property name="orient">wxVERTICAL</property>
@@ -1610,7 +1610,7 @@
                         <event name="OnGridLabelLeftDClick"></event>
                         <event name="OnGridLabelRightClick"></event>
                         <event name="OnGridLabelRightDClick"></event>
-                        <event name="OnGridRangeSelect">on_grid_range_select</event>
+                        <event name="OnGridRangeSelect"></event>
                         <event name="OnGridRowSize"></event>
                         <event name="OnGridSelectCell">on_grid_select_cell</event>
                         <event name="OnKeyDown">on_grid_key_down</event>
