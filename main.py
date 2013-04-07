@@ -30,6 +30,7 @@ SHORTCUTS = {
 Find Next: ⌘ + F
 Find Next: ⌘ + G
 Find Prev: ⌘ + ⇧ + G
+Save: ⌘ + S
 Save As: ⌘ + ⇧ + S
 
 ===Table Shortcuts===
@@ -47,7 +48,8 @@ Insert Row: ⌘ + I
 Find Next: Control + F
 Find Next: Control + G
 Find Prev: Control + Shift + G
-Save As: Control + S
+Save: Control + S
+Save As: Control + Shift + S
 
 ===Table Shortcuts===
 Edit Row: Enter
@@ -545,6 +547,15 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         if name == "foreground" or name == "background":
             self.m_plist_grid.GetParent().reshow(row, col)
 
+    def validate_name(self, name):
+        valid = True
+        editor = self.GetParent().GetParent().GetParent()
+        for k in editor.scheme["settings"][0]["settings"]:
+            if name == k:
+                valid = False
+                break
+        return valid
+
     def insert_row(self):
         grid = self.m_plist_grid
         num = grid.GetNumberRows()
@@ -554,13 +565,21 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         else:
             grid.AppendRows(1)
             row = 0
-        text = ["new_item", "nothing"]
+
+        new_name = "new_item"
+        count = 0
+        while not self.validate_name(new_name):
+            new_name = "new_item_%d" % count
+            count += 1
+
+        text = [new_name, "nothing"]
         [grid.SetCellValue(row, x, text[x]) for x in range(0, 2)]
         grid.GetParent().update_row(row, text[0], text[1])
         self.go_cell(grid, row, 0)
         grid.GetParent().update_plist(JSON_ADD, {"table": "global", "index": text[0], "data": text[1]})
         GlobalEditor(
             wx.GetApp().TopWindow,
+            self.GetParent().GetParent().GetParent().scheme["settings"][0]["settings"],
             text[0],
             text[1]
         ).Show()
@@ -570,6 +589,7 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         row = grid.GetGridCursorRow()
         GlobalEditor(
             wx.GetApp().TopWindow,
+            self.GetParent().GetParent().GetParent().scheme["settings"][0]["settings"],
             grid.GetCellValue(row, 0),
             grid.GetCellValue(row, 1)
         ).Show()
@@ -591,7 +611,7 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
 # Settings Dialogs
 #################################################
 class GlobalEditor(editor.GlobalSetting):
-    def __init__(self, parent, name, value):
+    def __init__(self, parent, current_entries, name, value):
         super(GlobalEditor, self).__init__(parent)
         self.Parent.Disable()
         self.Fit()
@@ -605,6 +625,9 @@ class GlobalEditor(editor.GlobalSetting):
         self.apply_settings = False
         self.color_setting = False
         self.m_color_picker.Disable()
+        self.entries = current_entries
+        self.current_name = name
+        self.valid = True
 
         self.m_name_textbox.SetValue(self.obj_key)
         try:
@@ -662,6 +685,22 @@ class GlobalEditor(editor.GlobalSetting):
             self.m_color_picker.Refresh()
         event.Skip()
 
+    def is_name_valid(self):
+        valid = True
+        name = self.m_name_textbox.GetValue()
+        if name != self.current_name:
+            for k in self.entries:
+                if name == k:
+                    valid = False
+                    break
+        return valid
+
+    def on_global_name_blur(self, event):
+        if not self.is_name_valid():
+            error("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
+            self.m_name_textbox.SetValue(self.current_name)
+        else:
+            self.current_name = self.m_name_textbox.GetValue()
 
     def on_color_change(self, event):
         if not self.color_setting:
@@ -700,8 +739,13 @@ class GlobalEditor(editor.GlobalSetting):
         event.Skip()
 
     def on_apply_button_click(self, event):
-        self.apply_settings = True
-        self.Close()
+        self.m_apply_button.SetFocus()
+        if self.is_name_valid():
+            self.apply_settings = True
+            self.Close()
+        else:
+            error("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
+            self.m_name_textbox.SetValue(self.current_name)
 
     def on_set_color_close(self, event):
         if self.apply_settings:
@@ -923,19 +967,22 @@ class ColorEditor(editor.ColorSetting):
 # Editor Dialog
 #################################################
 class Editor(editor.EditorFrame):
-    def __init__(self, parent, scheme, j_file, t_file, debugging=False):
+    def __init__(self, parent, scheme, j_file, t_file, live_save, debugging=False):
         super(Editor, self).__init__(parent)
         findid = wx.NewId()
         findnextid = wx.NewId()
         findprevid = wx.NewId()
+        saveasid = wx.NewId()
         saveid = wx.NewId()
         scid = wx.NewId()
+        self.live_save = bool(live_save)
         self.updates_made = False
         if debugging:
             debugid= wx.NewId()
             self.Bind(wx.EVT_MENU, self.on_debug_console, id=debugid)
         self.Bind(wx.EVT_MENU, self.on_shortcuts, id=scid)
-        self.Bind(wx.EVT_MENU, self.on_save_as, id=saveid)
+        self.Bind(wx.EVT_MENU, self.on_save_as, id=saveasid)
+        self.Bind(wx.EVT_MENU, self.on_save, id=saveid)
         self.Bind(wx.EVT_MENU, self.focus_find, id=findid)
         self.Bind(wx.EVT_MENU, self.on_next_find, id=findnextid)
         self.Bind(wx.EVT_MENU, self.on_prev_find, id=findprevid)
@@ -943,7 +990,8 @@ class Editor(editor.EditorFrame):
         accel_tbl = wx.AcceleratorTable(
             [
                 (mod, ord('B'), scid),
-                (mod|wx.ACCEL_SHIFT, ord('S'), saveid),
+                (mod|wx.ACCEL_SHIFT, ord('S'), saveasid),
+                (mod, ord('S'), saveid),
                 (mod,  ord('F'), findid ),
                 (mod, ord('G'), findnextid),
                 (mod|wx.ACCEL_SHIFT, ord('G'), findprevid)
@@ -972,6 +1020,8 @@ class Editor(editor.EditorFrame):
         self.m_plist_uuid_textbox.SetValue(scheme["uuid"])
         self.last_UUID = scheme["uuid"]
         self.last_plist_name = scheme["name"]
+
+        self.m_menuitem_save.Enable(False)
 
         self.m_plist_notebook.InsertPage(0, self.m_global_settings, "Global Settings", True)
         self.m_plist_notebook.InsertPage(1, self.m_style_settings, "Scope Settings", False)
@@ -1033,7 +1083,10 @@ class Editor(editor.EditorFrame):
         else:
             log.debug("No valid edit actions!")
 
-        self.save("tmtheme")
+        if self.live_save:
+            self.save("tmtheme")
+        elif self.updates_made:
+            self.m_menuitem_save.Enable(True)
 
     def rebuild_plist(self):
         self.scheme["name"] = self.m_plist_name_textbox.GetValue()
@@ -1069,7 +1122,8 @@ class Editor(editor.EditorFrame):
 
             self.scheme["settings"].append(obj)
 
-        self.save("tmtheme")
+        if self.live_save:
+            self.save("tmtheme")
 
     def save(self, request):
         if request == "tmtheme" or request == "all":
@@ -1085,6 +1139,8 @@ class Editor(editor.EditorFrame):
                 with codec_open(self.json, "w", "utf-8") as f:
                     f.write((json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
                 self.updates_made = False
+                if not self.live_save:
+                    self.m_menuitem_save.Enable(False)
             except:
                 log.debug("JSON file write error!")
                 error('Unexpected problem trying to write .tmTheme.JSON file!')
@@ -1229,6 +1285,10 @@ class Editor(editor.EditorFrame):
         grid.EndBatch()
         event.Skip()
 
+    def on_save(self, event):
+        if not self.live_save:
+            self.save("all")
+
     def on_save_as(self, event):
         save_file = query_user_for_file(action="new")
         if save_file is not None:
@@ -1244,7 +1304,7 @@ class Editor(editor.EditorFrame):
             self.json = j_file
             self.tmtheme = t_file
             self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
-            self.save("tmtheme")
+            self.save("all")
 
     def on_about(self, event):
         info("Color Scheme Editor: version %s" % __version__)
@@ -1287,10 +1347,12 @@ class Editor(editor.EditorFrame):
             log.set_echo(False)
             if app.stdioWin is not None:
                 app.stdioWin.close()
-        if self.updates_made:
+        if self.live_save and self.updates_made:
             self.save("json")
+        elif not self.live_save and self.updates_made:
+            if yesno(None, "You have unsaved changes.  Save?", "Color Scheme Editor"):
+                self.save("all")
         event.Skip()
-
 
 
 #################################################
@@ -1417,6 +1479,7 @@ def parse_arguments(script):
     parser.add_argument('--version', action='version', version=('%(prog)s ' + __version__))
     parser.add_argument('--debug', '-d', action='store_true', default=False, help=argparse.SUPPRESS)
     parser.add_argument('--log', '-l', nargs='?', default=script, help="Absolute path to directory to store log file")
+    parser.add_argument('--manual_save', '-m', action='store_true', default=False, help="Disable live save. Requires manual saves.")
     # Mutually exclusinve flags
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--select', '-s', action='store_true', default=False, help="Prompt for theme selection")
@@ -1459,7 +1522,7 @@ def main(script):
         j_file, t_file, cs = parse_file(args.file)
 
     if j_file is not None and t_file is not None:
-        main_win = Editor(None, cs, j_file, t_file, debugging=args.debug)
+        main_win = Editor(None, cs, j_file, t_file, live_save=args.manual_save, debugging=args.debug)
         main_win.Show()
         app.MainLoop()
     return 0
