@@ -1377,9 +1377,23 @@ def parse_file(file_path):
         if is_json:
             j_file = file_path
             t_file = file_path[:-5]
+
+            if not exists(t_file):
+                try:
+                    with codec_open(t_file, "w", "utf-8") as f:
+                        f.write((writePlistToString(color_scheme) + '\n').decode('utf8'))
+                except:
+                    log.debug("tmTheme file write error!")
         else:
             j_file = file_path + ".JSON"
             t_file = file_path
+
+            if not exists(j_file):
+                try:
+                    with codec_open(j_file, "w", "utf-8") as f:
+                        f.write((json.dumps(color_scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
+                except:
+                    log.debug("JSON file write error!")
 
     return j_file, t_file, color_scheme
 
