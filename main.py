@@ -930,6 +930,7 @@ class Editor(editor.EditorFrame):
         findprevid = wx.NewId()
         saveid = wx.NewId()
         scid = wx.NewId()
+        self.updates_made = False
         if debugging:
             debugid= wx.NewId()
             self.Bind(wx.EVT_MENU, self.on_debug_console, id=debugid)
@@ -978,20 +979,24 @@ class Editor(editor.EditorFrame):
     def update_plist(self, code, args=None):
         if code == JSON_UUID:
             self.scheme["uuid"] = self.m_plist_uuid_textbox.GetValue()
+            self.updates_made = True
         elif code == JSON_NAME:
             self.scheme["name"] = self.m_plist_name_textbox.GetValue()
+            self.updates_made = True
         elif code == JSON_ADD and args is not None:
             log.debug("JSON add")
             if args["table"] == "style":
                 self.scheme["settings"].insert(args["index"] + 1, args["data"])
             else:
                 self.scheme["settings"][0]["settings"][args["index"]] = args["data"]
+            self.updates_made = True
         elif code == JSON_DELETE and args is not None:
             log.debug("JSON delete")
             if args["table"] == "style":
                 del self.scheme["settings"][args["index"] + 1]
             else:
                 del self.scheme["settings"][0]["settings"][args["index"]]
+            self.updates_made = True
         elif code == JSON_MOVE and args is not None:
             log.debug("JSON move")
             from_row = args["from"] + 1
@@ -999,6 +1004,7 @@ class Editor(editor.EditorFrame):
             item = self.scheme["settings"][from_row]
             del self.scheme["settings"][from_row]
             self.scheme["settings"].insert(to_row, item)
+            self.updates_made = True
         elif code == JSON_MODIFY and args is not None:
             log.debug("JSON modify")
             if args["table"] == "style":
@@ -1023,10 +1029,11 @@ class Editor(editor.EditorFrame):
                 self.scheme["settings"][args["index"] + 1] = obj
             else:
                 self.scheme["settings"][0]["settings"][args["index"]] = args["data"]
+            self.updates_made = True
         else:
             log.debug("No valid edit actions!")
 
-        self.save()
+        self.save("tmtheme")
 
     def rebuild_plist(self):
         self.scheme["name"] = self.m_plist_name_textbox.GetValue()
@@ -1062,22 +1069,26 @@ class Editor(editor.EditorFrame):
 
             self.scheme["settings"].append(obj)
 
-        self.save()
+        self.save("tmtheme")
 
-    def save(self):
-        try:
-            with codec_open(self.json, "w", "utf-8") as f:
-                f.write((json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
-        except:
-            log.debug("JSON file write error!")
-            error('Unexpected problem trying to write .tmTheme.JSON file!')
+    def save(self, request):
+        if request == "tmtheme" or request == "all":
+            try:
+                with codec_open(self.tmtheme, "w", "utf-8") as f:
+                    f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
+            except:
+                log.debug("tmTheme file write error!")
+                error('Unexpected problem trying to write .tmTheme file!')
 
-        try:
-            with codec_open(self.tmtheme, "w", "utf-8") as f:
-                f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
-        except:
-            log.debug("tmTheme file write error!")
-            error('Unexpected problem trying to write .tmTheme file!')
+        if request == "json" or request == "all":
+            try:
+                with codec_open(self.json, "w", "utf-8") as f:
+                    f.write((json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
+                self.updates_made = False
+            except:
+                log.debug("JSON file write error!")
+                error('Unexpected problem trying to write .tmTheme.JSON file!')
+
 
     def rebuild_tables(self, cur_row, cur_col):
         cur_page = self.m_plist_notebook.GetSelection()
@@ -1233,7 +1244,7 @@ class Editor(editor.EditorFrame):
             self.json = j_file
             self.tmtheme = t_file
             self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
-            self.save()
+            self.save("tmtheme")
 
     def on_about(self, event):
         info("Color Scheme Editor: version %s" % __version__)
@@ -1276,6 +1287,8 @@ class Editor(editor.EditorFrame):
             log.set_echo(False)
             if app.stdioWin is not None:
                 app.stdioWin.close()
+        if self.updates_made:
+            self.save("json")
         event.Skip()
 
 
