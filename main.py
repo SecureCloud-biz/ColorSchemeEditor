@@ -18,7 +18,7 @@ from os.path import exists, normpath, join, dirname, abspath, basename
 import _lib.simplelog as Log
 from _lib.default_new_theme import theme as default_new_theme
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 BG_COLOR = None
 FG_COLOR = None
