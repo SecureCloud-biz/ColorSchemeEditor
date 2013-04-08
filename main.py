@@ -17,6 +17,7 @@ import uuid
 from os.path import exists, normpath, join, dirname, abspath, basename
 import _lib.simplelog as Log
 from _lib.default_new_theme import theme as default_new_theme
+from time import sleep
 
 __version__ = "0.0.5"
 
@@ -333,12 +334,17 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
             if "underline" in font_style:
                 fs.SetUnderlined(True)
                 update_font = True
-            if update_font:
-                self.m_plist_grid.SetCellFont(count, 0, fs)
-                self.m_plist_grid.SetCellFont(count, 1, fs)
-                self.m_plist_grid.SetCellFont(count, 2, fs)
-                self.m_plist_grid.SetCellFont(count, 3, fs)
-                self.m_plist_grid.SetCellFont(count, 4, fs)
+
+            if not update_font:
+                fs.SetWeight(wx.NORMAL)
+                fs.SetStyle(wx.DEFAULT)
+                fs.SetUnderlined(False)
+
+            self.m_plist_grid.SetCellFont(count, 0, fs)
+            self.m_plist_grid.SetCellFont(count, 1, fs)
+            self.m_plist_grid.SetCellFont(count, 2, fs)
+            self.m_plist_grid.SetCellFont(count, 3, fs)
+            self.m_plist_grid.SetCellFont(count, 4, fs)
 
     def set_object(self, obj):
         row = self.m_plist_grid.GetGridCursorRow()
@@ -422,7 +428,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
             [grid.SetCellBackgroundColour(row - 1, x, bg[x]) for x in range(0, 5)]
             [grid.SetCellTextColour(row - 1, x, fg[x]) for x in range(0, 5)]
             [grid.SetCellFont(row - 1, x, font[x]) for x in range(0, 5)]
-            self.go_cell(grid, row - 1, col)
+            self.go_cell(grid, row - 1, col, True)
             grid.GetParent().update_plist(JSON_MOVE, {"from": row, "to": row - 1})
             grid.SetFocus()
 
@@ -441,7 +447,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
             [grid.SetCellBackgroundColour(row + 1, x, bg[x]) for x in range(0, 5)]
             [grid.SetCellTextColour(row + 1, x, fg[x]) for x in range(0, 5)]
             [grid.SetCellFont(row + 1, x, font[x]) for x in range(0, 5)]
-            self.go_cell(grid, row + 1, col)
+            self.go_cell(grid, row + 1, col, True)
             grid.GetParent().update_plist(JSON_MOVE, {"from": row, "to": row + 1})
             grid.SetFocus()
 
@@ -1085,6 +1091,7 @@ class Editor(editor.EditorFrame):
 
         if self.live_save:
             self.save("tmtheme")
+            sleep(0.5)
         elif self.updates_made:
             self.m_menuitem_save.Enable(True)
 
