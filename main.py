@@ -1479,7 +1479,7 @@ def parse_arguments(script):
     parser.add_argument('--version', action='version', version=('%(prog)s ' + __version__))
     parser.add_argument('--debug', '-d', action='store_true', default=False, help=argparse.SUPPRESS)
     parser.add_argument('--log', '-l', nargs='?', default=script, help="Absolute path to directory to store log file")
-    parser.add_argument('--manual_save', '-m', action='store_true', default=False, help="Disable live save. Requires manual saves.")
+    parser.add_argument('--live_save', '-L', action='store_true', default=False, help="Enable live save.")
     # Mutually exclusinve flags
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--select', '-s', action='store_true', default=False, help="Prompt for theme selection")
@@ -1522,7 +1522,7 @@ def main(script):
         j_file, t_file, cs = parse_file(args.file)
 
     if j_file is not None and t_file is not None:
-        main_win = Editor(None, cs, j_file, t_file, live_save=args.manual_save, debugging=args.debug)
+        main_win = Editor(None, cs, j_file, t_file, live_save=args.live_save, debugging=args.debug)
         main_win.Show()
         app.MainLoop()
     return 0
