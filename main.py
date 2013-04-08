@@ -316,35 +316,35 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         self.m_plist_grid.SetCellTextColour(count, 3, f)
         self.m_plist_grid.SetCellTextColour(count, 4, f)
 
-        if "fontStyle" in settings:
-            font_style = []
-            for x in settings["fontStyle"].split(" "):
-                if x in ["bold", "italic", "underline"]:
-                    font_style.append(x)
+        fs_setting = settings.get("fontStyle", "")
+        font_style = []
+        for x in fs_setting.split(" "):
+            if x in ["bold", "italic", "underline"]:
+                font_style.append(x)
 
-            self.m_plist_grid.SetCellValue(count, 3, " ".join(font_style))
-            fs = self.m_plist_grid.GetCellFont(count, 0)
-            update_font = False
-            if "bold" in font_style:
-                fs.SetWeight(wx.BOLD)
-                update_font = True
-            if "italic" in font_style:
-                fs.SetStyle(wx.ITALIC)
-                update_font = True
-            if "underline" in font_style:
-                fs.SetUnderlined(True)
-                update_font = True
+        self.m_plist_grid.SetCellValue(count, 3, " ".join(font_style))
+        fs = self.m_plist_grid.GetCellFont(count, 0)
+        update_font = False
+        if "bold" in font_style:
+            fs.SetWeight(wx.FONTWEIGHT_BOLD)
+            update_font = True
+        if "italic" in font_style:
+            fs.SetStyle(wx.FONTSTYLE_ITALIC)
+            update_font = True
+        if "underline" in font_style:
+            fs.SetUnderlined(True)
+            update_font = True
 
-            if not update_font:
-                fs.SetWeight(wx.NORMAL)
-                fs.SetStyle(wx.DEFAULT)
-                fs.SetUnderlined(False)
+        if not update_font:
+            fs.SetWeight(wx.FONTWEIGHT_NORMAL)
+            fs.SetStyle(wx.FONTSTYLE_NORMAL)
+            fs.SetUnderlined(False)
 
-            self.m_plist_grid.SetCellFont(count, 0, fs)
-            self.m_plist_grid.SetCellFont(count, 1, fs)
-            self.m_plist_grid.SetCellFont(count, 2, fs)
-            self.m_plist_grid.SetCellFont(count, 3, fs)
-            self.m_plist_grid.SetCellFont(count, 4, fs)
+        self.m_plist_grid.SetCellFont(count, 0, fs)
+        self.m_plist_grid.SetCellFont(count, 1, fs)
+        self.m_plist_grid.SetCellFont(count, 2, fs)
+        self.m_plist_grid.SetCellFont(count, 3, fs)
+        self.m_plist_grid.SetCellFont(count, 4, fs)
 
     def set_object(self, obj):
         row = self.m_plist_grid.GetGridCursorRow()

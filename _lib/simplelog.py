@@ -57,9 +57,8 @@ class Log(object):
             self._log(self.formater("CRITICAL", format, msg, fmt), echo)
 
     def _log(self, msg, echo=True):
-        if echo:
-            if self.save_to_file:
-                with open(self.filename, "a") as f:
-                    f.write(self.format % {"message": msg})
-            if self.echo:
-                print(self.format % {"message": msg})
+        if self.save_to_file:
+            with open(self.filename, "a") as f:
+                f.write(self.format % {"message": msg})
+        if echo and self.echo:
+            print(self.format % {"message": msg})
