@@ -365,8 +365,9 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
     def edit_cell(self):
         grid = self.m_plist_grid
         row = grid.GetGridCursorRow()
+        editor = self.GetParent().GetParent().GetParent()
         ColorEditor(
-            wx.GetApp().TopWindow,
+            editor,
             {
                 "name": grid.GetCellValue(row, 0),
                 "scope": grid.GetCellValue(row, 4),
@@ -376,7 +377,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
                     "fontStyle": grid.GetCellValue(row, 3)
                 }
             }
-        ).Show()
+        ).ShowModal()
 
     def delete_row(self):
         row = self.m_plist_grid.GetGridCursorRow()
@@ -408,10 +409,11 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         grid.GetParent().update_row(row, obj)
         self.go_cell(grid, row, 0)
         grid.GetParent().update_plist(JSON_ADD, {"table": "style", "index": row, "data": obj})
+        editor = self.GetParent().GetParent().GetParent()
         ColorEditor(
-            wx.GetApp().TopWindow,
+            editor,
             obj
-        ).Show()
+        ).ShowModal()
 
     def row_up(self):
         grid = self.m_plist_grid
@@ -583,22 +585,24 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         grid.GetParent().update_row(row, text[0], text[1])
         self.go_cell(grid, row, 0)
         grid.GetParent().update_plist(JSON_ADD, {"table": "global", "index": text[0], "data": text[1]})
+        editor = self.GetParent().GetParent().GetParent()
         GlobalEditor(
-            wx.GetApp().TopWindow,
-            self.GetParent().GetParent().GetParent().scheme["settings"][0]["settings"],
+            editor,
+            editor.scheme["settings"][0]["settings"],
             text[0],
             text[1]
-        ).Show()
+        ).ShowModal()
 
     def edit_cell(self):
         grid = self.m_plist_grid
         row = grid.GetGridCursorRow()
+        editor = self.GetParent().GetParent().GetParent()
         GlobalEditor(
-            wx.GetApp().TopWindow,
-            self.GetParent().GetParent().GetParent().scheme["settings"][0]["settings"],
+            editor,
+            editor.scheme["settings"][0]["settings"],
             grid.GetCellValue(row, 0),
             grid.GetCellValue(row, 1)
-        ).Show()
+        ).ShowModal()
 
     def on_mouse_motion(self, event):
         self.mouse_motion(event)
@@ -616,10 +620,22 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
 #################################################
 # Settings Dialogs
 #################################################
-class GlobalEditor(editor.GlobalSetting):
+class SettingsKeyBindings(object):
+    def setup_keybindings(self):
+        closeid = wx.NewId()
+
+        self.Bind(wx.EVT_MENU, lambda: self.close(), id=closeid)
+
+        accel_tbl = wx.AcceleratorTable(
+            [
+                (wx.ACCEL_NORMAL, wx.WXK_ESCAPE, closeid)
+            ]
+        )
+
+class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
     def __init__(self, parent, current_entries, name, value):
         super(GlobalEditor, self).__init__(parent)
-        self.Parent.Disable()
+        self.setup_keybindings()
         self.Fit()
         size = self.GetSize()
         self.SetMinSize(size)
@@ -760,14 +776,13 @@ class GlobalEditor(editor.GlobalSetting):
 
             self.Parent.set_global_object(self.obj_key, self.obj_val)
 
-        self.Parent.Enable()
         event.Skip()
 
 
-class ColorEditor(editor.ColorSetting):
+class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
     def __init__(self, parent, obj):  # name, foreground, background, fontstyle, scope):
         super(ColorEditor, self).__init__(parent)
-        self.Parent.Disable()
+        self.setup_keybindings()
         self.Fit()
         size = self.GetSize()
         self.SetMinSize(size)
@@ -964,8 +979,6 @@ class ColorEditor(editor.ColorSetting):
             }
 
             self.Parent.set_style_object(self.color_obj)
-        self.Parent.Enable()
-
         event.Skip()
 
 
