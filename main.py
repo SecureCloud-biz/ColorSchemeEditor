@@ -17,9 +17,10 @@ import uuid
 from os.path import exists, normpath, join, dirname, abspath, basename
 import _lib.simplelog as Log
 from _lib.default_new_theme import theme as default_new_theme
-from time import sleep
+from time import sleep, time
+import threading
 
-__version__ = "0.0.5"
+__version__ = "0.0.6"
 
 BG_COLOR = None
 FG_COLOR = None
@@ -106,6 +107,85 @@ class CustomApp(wx.App):
     def __init__(self, *args, **kwargs):
         self.outputWindowClass = CustomLog
         super(CustomApp, self).__init__(*args, **kwargs)
+
+
+class LiveUpdate(threading.Thread):
+    def __init__(self, func, queue):
+        self.func = func
+        self.queue = queue
+        self.last_queue_len = len(queue)
+        self.abort = False
+        self.last_update = 0.0
+        self.done = False
+        self.locked = False
+        threading.Thread.__init__(self)
+
+    def kill_thread(self):
+        self.abort = True
+
+    def lock_queue(self):
+        if not self.is_queue_locked():
+            self.locked = True
+            return True
+        return False
+
+    def release_queue(self):
+        if self.is_queue_locked():
+            self.locked = False
+            return True
+        return False
+
+    def is_queue_locked(self):
+        return self.locked
+
+    def is_done(self):
+        return self.done
+
+    def update(self, queue):
+        request = None
+        wx.CallAfter(log.debug, queue)
+        for x in queue:
+            if x == "all":
+                request = x
+                break
+            elif x == "json":
+                if request == "tmtheme":
+                    request = "all"
+                else:
+                    request = x
+            elif x == "tmtheme":
+                if request == "json":
+                    request = "all"
+                    break
+                else:
+                    request = x
+
+        wx.CallAfter(self.func, request, "Live Thread")
+
+    def _process_queue(self):
+        while not self.lock_queue():
+            sleep(.2)
+        current_queue = self.queue[0:self.last_queue_len]
+        del self.queue[0:self.last_queue_len]
+        self.last_queue_len = len(self.queue)
+        self.release_queue()
+        return current_queue
+
+    def run(self):
+        while not self.abort:
+            now = time()
+            if len(self.queue) and (now - .5) > self.last_update:
+                if len(self.queue) != self.last_queue_len:
+                    self.last_queue_len = len(self.queue)
+                else:
+                    self.update(self._process_queue())
+                    self.last_update = time()
+            if self.abort:
+                break
+            sleep(.5)
+        if len(self.queue):
+            self.update(self._process_queue())
+        self.done = True
 
 
 #################################################
@@ -1062,8 +1142,12 @@ class Editor(editor.EditorFrame):
 
         self.m_plist_notebook.InsertPage(0, self.m_global_settings, "Global Settings", True)
         self.m_plist_notebook.InsertPage(1, self.m_style_settings, "Scope Settings", False)
+        self.queue = []
+        if self.live_save:
+            self.update_thread = LiveUpdate(self.save, self.queue)
+            self.update_thread.start()
 
-    def update_plist(self, code, args=None):
+    def update_plist(self, code, args):
         if code == JSON_UUID:
             self.scheme["uuid"] = self.m_plist_uuid_textbox.GetValue()
             self.updates_made = True
@@ -1121,8 +1205,10 @@ class Editor(editor.EditorFrame):
             log.debug("No valid edit actions!")
 
         if self.live_save:
-            self.save("tmtheme")
-            # sleep(0.5)
+            while not self.update_thread.lock_queue():
+                sleep(.2)
+            self.queue.append("tmtheme")
+            self.update_thread.release_queue()
         elif self.updates_made:
             self.m_menuitem_save.Enable(True)
 
@@ -1161,9 +1247,13 @@ class Editor(editor.EditorFrame):
             self.scheme["settings"].append(obj)
 
         if self.live_save:
-            self.save("tmtheme")
+            while not self.update_thread.lock_queue():
+                sleep(.2)
+            self.queue.append("tmtheme")
+            self.update_thread.release_queue()
 
-    def save(self, request):
+    def save(self, request, requester="Main Thread"):
+        log.debug("%s requested save - %s" % (requester, request))
         if request == "tmtheme" or request == "all":
             try:
                 with codec_open(self.tmtheme, "w", "utf-8") as f:
@@ -1325,6 +1415,10 @@ class Editor(editor.EditorFrame):
 
     def on_save(self, event):
         if not self.live_save:
+            while not self.update_thread.lock_queue():
+                sleep(.2)
+            del self.queue[0:len(self.queue)]
+            self.update_thread.release_queue()
             self.save("all")
 
     def on_save_as(self, event):
@@ -1342,6 +1436,10 @@ class Editor(editor.EditorFrame):
             self.json = j_file
             self.tmtheme = t_file
             self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
+            while not self.update_thread.lock_queue():
+                sleep(.2)
+            del self.queue[0:len(self.queue)]
+            self.update_thread.release_queue()
             self.save("all")
 
     def on_about(self, event):
@@ -1385,6 +1483,10 @@ class Editor(editor.EditorFrame):
             log.set_echo(False)
             if app.stdioWin is not None:
                 app.stdioWin.close()
+        self.update_thread.kill_thread()
+        if self.live_save:
+            while not self.update_thread.is_done():
+                sleep(0.5)
         if self.live_save and self.updates_made:
             self.save("json")
         elif not self.live_save and self.updates_made:
