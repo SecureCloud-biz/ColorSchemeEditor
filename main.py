@@ -465,6 +465,18 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
     def on_grid_select_cell(self, event):
         self.grid_select_cell(event)
 
+    def on_row_up_click(self, event):
+        self.row_up()
+
+    def on_row_down_click(self, event):
+        self.row_down()
+
+    def on_row_add_click(self, event):
+        self.insert_row()
+
+    def on_row_delete_click(self, event):
+        self.delete_row()
+
 
 class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
     def __init__(self, parent, scheme, update, reshow):
@@ -615,6 +627,12 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
 
     def on_grid_select_cell(self, event):
         self.grid_select_cell(event)
+
+    def on_row_add_click(self, event):
+        self.insert_row()
+
+    def on_row_delete_click(self, event):
+        self.delete_row()
 
 
 #################################################
@@ -780,7 +798,7 @@ class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
 
 
 class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
-    def __init__(self, parent, obj):  # name, foreground, background, fontstyle, scope):
+    def __init__(self, parent, obj):
         super(ColorEditor, self).__init__(parent)
         self.setup_keybindings()
         self.Fit()
@@ -1104,7 +1122,7 @@ class Editor(editor.EditorFrame):
 
         if self.live_save:
             self.save("tmtheme")
-            sleep(0.5)
+            # sleep(0.5)
         elif self.updates_made:
             self.m_menuitem_save.Enable(True)
 
