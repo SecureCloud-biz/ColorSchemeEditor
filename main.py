@@ -109,6 +109,9 @@ class CustomApp(wx.App):
         super(CustomApp, self).__init__(*args, **kwargs)
 
 
+#################################################
+# Live Update Manager
+#################################################
 class LiveUpdate(threading.Thread):
     def __init__(self, func, queue):
         self.func = func
@@ -143,7 +146,6 @@ class LiveUpdate(threading.Thread):
 
     def update(self, queue):
         request = None
-        wx.CallAfter(log.debug, queue)
         for x in queue:
             if x == "all":
                 request = x
