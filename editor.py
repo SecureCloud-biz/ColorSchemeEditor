@@ -125,6 +125,9 @@ class EditorFrame ( wx.Frame ):
 		self.m_menuitem_save_as = wx.MenuItem( self.m_menu_file, wx.ID_ANY, u"Save As", wx.EmptyString, wx.ITEM_NORMAL )
 		self.m_menu_file.AppendItem( self.m_menuitem_save_as )
 		
+		self.m_menuitem_open = wx.MenuItem( self.m_menu_file, wx.ID_ANY, u"Open", wx.EmptyString, wx.ITEM_NORMAL )
+		self.m_menu_file.AppendItem( self.m_menuitem_open )
+		
 		self.m_menubar.Append( self.m_menu_file, u"File" ) 
 		
 		self.m_menu_help = wx.Menu()
@@ -155,6 +158,7 @@ class EditorFrame ( wx.Frame ):
 		self.m_plist_notebook.Bind( wx.EVT_SIZE, self.on_plist_notebook_size )
 		self.Bind( wx.EVT_MENU, self.on_save, id = self.m_menuitem_save.GetId() )
 		self.Bind( wx.EVT_MENU, self.on_save_as, id = self.m_menuitem_save_as.GetId() )
+		self.Bind( wx.EVT_MENU, self.on_open_new, id = self.m_menuitem_open.GetId() )
 		self.Bind( wx.EVT_MENU, self.on_shortcuts, id = self.m_menuitem_keys.GetId() )
 		self.Bind( wx.EVT_MENU, self.on_about, id = self.m_menuitem_about.GetId() )
 	
@@ -197,6 +201,9 @@ class EditorFrame ( wx.Frame ):
 		event.Skip()
 	
 	def on_save_as( self, event ):
+		event.Skip()
+	
+	def on_open_new( self, event ):
 		event.Skip()
 	
 	def on_shortcuts( self, event ):

@@ -1364,6 +1364,18 @@ class Editor(editor.EditorFrame):
             grid.SetFocus()
             panel.go_cell(grid, prev[0], prev[1], True)
 
+    def file_close_cleanup(self):
+        if self.live_save:
+            self.update_thread.kill_thread()
+            if self.live_save:
+                while not self.update_thread.is_done():
+                    sleep(0.5)
+        if self.live_save and self.updates_made:
+            self.save("json")
+        elif not self.live_save and self.updates_made:
+            if yesno(None, "You have unsaved changes.  Save?", "Color Scheme Editor"):
+                self.save("all")
+
     def on_plist_name_blur(self, event):
         set_name = self.m_plist_name_textbox.GetValue()
         if set_name != self.last_plist_name:
@@ -1411,6 +1423,22 @@ class Editor(editor.EditorFrame):
             grid.SetColSize(4, grid.GetColSize(4) + delta)
         grid.EndBatch()
         event.Skip()
+
+    def on_open_new(self, event):
+        self.file_close_cleanup()
+        save_file = query_user_for_file(action="select")
+        if save_file is not None:
+            j_file, t_file, color_scheme = parse_file(save_file)
+            if j_file is not None and t_file is not None:
+                self.json = j_file
+                self.tmtheme = t_file
+                self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
+                self.scheme = color_scheme
+                self.m_plist_name_textbox.SetValue(self.scheme["name"])
+                self.m_plist_uuid_textbox.SetValue(self.scheme["uuid"])
+                self.last_UUID = self.scheme["uuid"]
+                self.last_plist_name = self.scheme["name"]
+                self.rebuild_tables(None, None)
 
     def on_save(self, event):
         if not self.live_save:
@@ -1479,16 +1507,7 @@ class Editor(editor.EditorFrame):
             log.set_echo(False)
             if app.stdioWin is not None:
                 app.stdioWin.close()
-        if self.live_save:
-            self.update_thread.kill_thread()
-            if self.live_save:
-                while not self.update_thread.is_done():
-                    sleep(0.5)
-        if self.live_save and self.updates_made:
-            self.save("json")
-        elif not self.live_save and self.updates_made:
-            if yesno(None, "You have unsaved changes.  Save?", "Color Scheme Editor"):
-                self.save("all")
+        self.file_close_cleanup()
         event.Skip()
 
 
