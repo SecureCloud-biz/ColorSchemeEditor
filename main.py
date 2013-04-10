@@ -722,15 +722,12 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
 #################################################
 class SettingsKeyBindings(object):
     def setup_keybindings(self):
-        closeid = wx.NewId()
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
 
-        self.Bind(wx.EVT_MENU, lambda: self.close(), id=closeid)
+    def on_char_hook(self, event):
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.Close()
 
-        accel_tbl = wx.AcceleratorTable(
-            [
-                (wx.ACCEL_NORMAL, wx.WXK_ESCAPE, closeid)
-            ]
-        )
 
 class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
     def __init__(self, parent, current_entries, name, value):
