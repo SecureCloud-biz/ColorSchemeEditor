@@ -1417,10 +1417,6 @@ class Editor(editor.EditorFrame):
 
     def on_save(self, event):
         if not self.live_save:
-            while not self.update_thread.lock_queue():
-                sleep(.2)
-            del self.queue[0:len(self.queue)]
-            self.update_thread.release_queue()
             self.save("all")
 
     def on_save_as(self, event):
@@ -1438,10 +1434,11 @@ class Editor(editor.EditorFrame):
             self.json = j_file
             self.tmtheme = t_file
             self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
-            while not self.update_thread.lock_queue():
-                sleep(.2)
-            del self.queue[0:len(self.queue)]
-            self.update_thread.release_queue()
+            if self.live_save:
+                while not self.update_thread.lock_queue():
+                    sleep(.2)
+                del self.queue[0:len(self.queue)]
+                self.update_thread.release_queue()
             self.save("all")
 
     def on_about(self, event):
@@ -1485,10 +1482,11 @@ class Editor(editor.EditorFrame):
             log.set_echo(False)
             if app.stdioWin is not None:
                 app.stdioWin.close()
-        self.update_thread.kill_thread()
         if self.live_save:
-            while not self.update_thread.is_done():
-                sleep(0.5)
+            self.update_thread.kill_thread()
+            if self.live_save:
+                while not self.update_thread.is_done():
+                    sleep(0.5)
         if self.live_save and self.updates_made:
             self.save("json")
         elif not self.live_save and self.updates_made:
