@@ -20,7 +20,7 @@ from _lib.default_new_theme import theme as default_new_theme
 from time import sleep, time
 import threading
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 
 BG_COLOR = None
 FG_COLOR = None
@@ -43,6 +43,9 @@ Switch to Global Settings: ⌥ + ←
 Switch to Style Settings: ⌥ + →
 Delete Row: ⌫
 Insert Row: ⌘ + I
+Toggle 'bold' font: B
+Toggle 'italic' font: I
+Toggle 'underlined' font: U
 ''',
 
     "windows": u'''
@@ -61,6 +64,9 @@ Switch to Global Settings: Alt + ←
 Switch to Style Settings: Alt + →
 Delete Row: Delete
 Insert Row: Control + I
+Toggle 'bold' font: B
+Toggle 'italic' font: I
+Toggle 'underlined' font: U
 '''
 }
 
@@ -546,8 +552,8 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         return self.m_plist_grid.GetGridCursorCol() == 3
 
     def toggle_font_style(self, row, attr):
-        if not self.is_fontstyle_cell():
-            return
+        # if not self.is_fontstyle_cell():
+        #     return
         grid = self.m_plist_grid
         text = [grid.GetCellValue(row, x) for x in range(0, 5)]
         style = text[3].split(" ")
