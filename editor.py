@@ -119,14 +119,14 @@ class EditorFrame ( wx.Frame ):
 		self.Layout()
 		self.m_menubar = wx.MenuBar( 0 )
 		self.m_menu_file = wx.Menu()
+		self.m_menuitem_open = wx.MenuItem( self.m_menu_file, wx.ID_ANY, u"Open", wx.EmptyString, wx.ITEM_NORMAL )
+		self.m_menu_file.AppendItem( self.m_menuitem_open )
+		
 		self.m_menuitem_save = wx.MenuItem( self.m_menu_file, wx.ID_ANY, u"Save", wx.EmptyString, wx.ITEM_NORMAL )
 		self.m_menu_file.AppendItem( self.m_menuitem_save )
 		
 		self.m_menuitem_save_as = wx.MenuItem( self.m_menu_file, wx.ID_ANY, u"Save As", wx.EmptyString, wx.ITEM_NORMAL )
 		self.m_menu_file.AppendItem( self.m_menuitem_save_as )
-		
-		self.m_menuitem_open = wx.MenuItem( self.m_menu_file, wx.ID_ANY, u"Open", wx.EmptyString, wx.ITEM_NORMAL )
-		self.m_menu_file.AppendItem( self.m_menuitem_open )
 		
 		self.m_menubar.Append( self.m_menu_file, u"File" ) 
 		
@@ -156,9 +156,9 @@ class EditorFrame ( wx.Frame ):
 		self.m_button4.Bind( wx.EVT_BUTTON, self.on_prev_find )
 		self.m_button5.Bind( wx.EVT_BUTTON, self.on_next_find )
 		self.m_plist_notebook.Bind( wx.EVT_SIZE, self.on_plist_notebook_size )
+		self.Bind( wx.EVT_MENU, self.on_open_new, id = self.m_menuitem_open.GetId() )
 		self.Bind( wx.EVT_MENU, self.on_save, id = self.m_menuitem_save.GetId() )
 		self.Bind( wx.EVT_MENU, self.on_save_as, id = self.m_menuitem_save_as.GetId() )
-		self.Bind( wx.EVT_MENU, self.on_open_new, id = self.m_menuitem_open.GetId() )
 		self.Bind( wx.EVT_MENU, self.on_shortcuts, id = self.m_menuitem_keys.GetId() )
 		self.Bind( wx.EVT_MENU, self.on_about, id = self.m_menuitem_about.GetId() )
 	
@@ -197,13 +197,13 @@ class EditorFrame ( wx.Frame ):
 	def on_plist_notebook_size( self, event ):
 		event.Skip()
 	
+	def on_open_new( self, event ):
+		event.Skip()
+	
 	def on_save( self, event ):
 		event.Skip()
 	
 	def on_save_as( self, event ):
-		event.Skip()
-	
-	def on_open_new( self, event ):
 		event.Skip()
 	
 	def on_shortcuts( self, event ):
@@ -291,6 +291,7 @@ class GlobalSettingsPanel ( wx.Panel ):
 		self.m_row_add.Bind( wx.EVT_BUTTON, self.on_row_add_click )
 		self.m_row_delete.Bind( wx.EVT_BUTTON, self.on_row_delete_click )
 		self.m_plist_grid.Bind( wx.grid.EVT_GRID_CELL_LEFT_DCLICK, self.on_edit_cell )
+		self.m_plist_grid.Bind( wx.grid.EVT_GRID_LABEL_LEFT_CLICK, self.on_grid_label_left_click )
 		self.m_plist_grid.Bind( wx.grid.EVT_GRID_SELECT_CELL, self.on_grid_select_cell )
 		self.m_plist_grid.Bind( wx.EVT_KEY_DOWN, self.on_grid_key_down )
 	
@@ -306,6 +307,9 @@ class GlobalSettingsPanel ( wx.Panel ):
 		event.Skip()
 	
 	def on_edit_cell( self, event ):
+		event.Skip()
+	
+	def on_grid_label_left_click( self, event ):
 		event.Skip()
 	
 	def on_grid_select_cell( self, event ):
@@ -409,6 +413,7 @@ class StyleSettingsPanel ( wx.Panel ):
 		self.m_row_add.Bind( wx.EVT_BUTTON, self.on_row_add_click )
 		self.m_row_delete.Bind( wx.EVT_BUTTON, self.on_row_delete_click )
 		self.m_plist_grid.Bind( wx.grid.EVT_GRID_CELL_LEFT_DCLICK, self.on_edit_cell )
+		self.m_plist_grid.Bind( wx.grid.EVT_GRID_LABEL_LEFT_CLICK, self.on_grid_label_left_click )
 		self.m_plist_grid.Bind( wx.grid.EVT_GRID_SELECT_CELL, self.on_grid_select_cell )
 		self.m_plist_grid.Bind( wx.EVT_KEY_DOWN, self.on_grid_key_down )
 	
@@ -430,6 +435,9 @@ class StyleSettingsPanel ( wx.Panel ):
 		event.Skip()
 	
 	def on_edit_cell( self, event ):
+		event.Skip()
+	
+	def on_grid_label_left_click( self, event ):
 		event.Skip()
 	
 	def on_grid_select_cell( self, event ):

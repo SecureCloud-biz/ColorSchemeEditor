@@ -207,6 +207,9 @@ class GridHelper(object):
         editid = wx.NewId()
         rowupid = wx.NewId()
         rowdownid = wx.NewId()
+        boldid = wx.NewId()
+        italicid = wx.NewId()
+        underlineid = wx.NewId()
 
         self.Bind(wx.EVT_MENU, self.on_delete_row, id=deleteid)
         self.Bind(wx.EVT_MENU, self.on_insert_row, id=insertid)
@@ -215,11 +218,17 @@ class GridHelper(object):
         self.Bind(wx.EVT_MENU, self.on_row_up, id=rowupid)
         self.Bind(wx.EVT_MENU, self.on_row_down, id=rowdownid)
         self.Bind(wx.EVT_MENU, self.on_edit_cell, id=editid)
+        self.Bind(wx.EVT_MENU, self.on_toggle_bold, id=boldid)
+        self.Bind(wx.EVT_MENU, self.on_toggle_italic, id=italicid)
+        self.Bind(wx.EVT_MENU, self.on_toggle_underline, id=underlineid)
 
         accel_tbl = wx.AcceleratorTable(
             [
                 (wx.ACCEL_NORMAL, wx.WXK_RETURN, editid),
                 (wx.ACCEL_NORMAL, wx.WXK_DELETE, deleteid),
+                (wx.ACCEL_NORMAL, ord('B'), boldid),
+                (wx.ACCEL_NORMAL, ord('I'), italicid),
+                (wx.ACCEL_NORMAL, ord('U'), underlineid),
                 (wx.ACCEL_ALT, wx.WXK_LEFT, panellid ),
                 (wx.ACCEL_ALT, wx.WXK_RIGHT, panelrid),
                 (wx.ACCEL_ALT, wx.WXK_UP, rowupid ),
@@ -304,6 +313,24 @@ class GridHelper(object):
     def on_edit_cell_key(self, event):
         self.edit_cell()
 
+    def on_toggle_bold(self, event):
+        self.toggle_bold()
+
+    def on_toggle_italic(self, event):
+        self.toggle_italic()
+
+    def on_toggle_underline(self, event):
+        self.toggle_underline()
+
+    def toggle_bold(self):
+        pass
+
+    def toggle_italic(self):
+        pass
+
+    def toggle_underline(self):
+        pass
+
     def row_up(self):
         pass
 
@@ -318,6 +345,7 @@ class GridHelper(object):
 
     def insert_row(self):
         pass
+
 
 #################################################
 # Grid Display Panels
@@ -346,16 +374,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
                 self.m_plist_grid.AppendRows(1)
                 self.update_row(count, s)
                 count += 1
-        self.m_plist_grid.BeginBatch()
-        nb_size = self.parent.GetSize()
-        total_size = 0
-        for x in range(0, 5):
-            self.m_plist_grid.AutoSizeColumn(x)
-            total_size += self.m_plist_grid.GetColSize(x)
-        delta = nb_size[0] - 20 - total_size
-        if delta > 0:
-            self.m_plist_grid.SetColSize(4, self.m_plist_grid.GetColSize(4) + delta)
-        self.m_plist_grid.EndBatch()
+        self.resize_table()
         self.go_cell(self.m_plist_grid, 0, 0)
 
     def update_row(self, count, s):
@@ -406,21 +425,18 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
 
         self.m_plist_grid.SetCellValue(count, 3, " ".join(font_style))
         fs = self.m_plist_grid.GetCellFont(count, 0)
-        update_font = False
+        fs.SetWeight(wx.FONTWEIGHT_NORMAL)
+        fs.SetStyle(wx.FONTSTYLE_NORMAL)
+        fs.SetUnderlined(False)
+
         if "bold" in font_style:
             fs.SetWeight(wx.FONTWEIGHT_BOLD)
-            update_font = True
+
         if "italic" in font_style:
             fs.SetStyle(wx.FONTSTYLE_ITALIC)
-            update_font = True
+
         if "underline" in font_style:
             fs.SetUnderlined(True)
-            update_font = True
-
-        if not update_font:
-            fs.SetWeight(wx.FONTWEIGHT_NORMAL)
-            fs.SetStyle(wx.FONTSTYLE_NORMAL)
-            fs.SetUnderlined(False)
 
         self.m_plist_grid.SetCellFont(count, 0, fs)
         self.m_plist_grid.SetCellFont(count, 1, fs)
@@ -428,11 +444,7 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         self.m_plist_grid.SetCellFont(count, 3, fs)
         self.m_plist_grid.SetCellFont(count, 4, fs)
 
-    def set_object(self, obj):
-        row = self.m_plist_grid.GetGridCursorRow()
-        col = self.m_plist_grid.GetGridCursorCol()
-        self.update_row(row, obj)
-        self.update_plist(JSON_MODIFY, {"table": "style", "index": row, "data": obj})
+    def resize_table(self):
         self.m_plist_grid.BeginBatch()
         nb_size = self.parent.GetSize()
         total_size = 0
@@ -443,6 +455,13 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         if delta > 0:
             self.m_plist_grid.SetColSize(4, self.m_plist_grid.GetColSize(4) + delta)
         self.m_plist_grid.EndBatch()
+
+    def set_object(self, obj):
+        row = self.m_plist_grid.GetGridCursorRow()
+        col = self.m_plist_grid.GetGridCursorCol()
+        self.update_row(row, obj)
+        self.update_plist(JSON_MODIFY, {"table": "style", "index": row, "data": obj})
+        self.resize_table()
 
     def edit_cell(self):
         grid = self.m_plist_grid
@@ -535,6 +554,44 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
             grid.GetParent().update_plist(JSON_MOVE, {"from": row, "to": row + 1})
             grid.SetFocus()
 
+    def is_fontstyle_cell(self):
+        return self.m_plist_grid.GetGridCursorCol() == 3
+
+    def toggle_font_style(self, row, attr):
+        if not self.is_fontstyle_cell():
+            return
+        grid = self.m_plist_grid
+        text = [grid.GetCellValue(row, x) for x in range(0, 5)]
+        style = text[3].split(" ")
+        try:
+            idx = style.index(attr)
+            del style[idx]
+        except:
+            style.append(attr)
+        text[3] = " ".join(style)
+
+        obj = {
+            "name": text[0],
+            "scope": text[4],
+            "settings": {
+                "foreground": text[1],
+                "background": text[2],
+                "fontStyle": text[3]
+            }
+        }
+        grid.GetParent().update_row(row, obj)
+        self.update_plist(JSON_MODIFY, {"table": "style", "index": row, "data": obj})
+        self.resize_table()
+
+    def toggle_bold(self):
+        self.toggle_font_style(self.m_plist_grid.GetGridCursorRow(), "bold")
+
+    def toggle_italic(self):
+        self.toggle_font_style(self.m_plist_grid.GetGridCursorRow(), "italic")
+
+    def toggle_underline(self):
+        self.toggle_font_style(self.m_plist_grid.GetGridCursorRow(), "underline")
+
     def on_mouse_motion(self, event):
         self.mouse_motion(event)
 
@@ -559,6 +616,9 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
     def on_row_delete_click(self, event):
         self.delete_row()
 
+    def on_grid_label_left_click(self, event):
+        return
+
 
 class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
     def __init__(self, parent, scheme, update, reshow):
@@ -580,12 +640,17 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         FG_COLOR = foreground
         count = 0
 
-        self.m_plist_grid.BeginBatch()
         for k in sorted(scheme["settings"][0]["settings"].iterkeys()):
             v = scheme["settings"][0]["settings"][k]
             self.m_plist_grid.AppendRows(1)
             self.update_row(count, k, v)
             count += 1
+        self.resize_table()
+
+        self.go_cell(self.m_plist_grid, 0, 0)
+
+    def resize_table(self):
+        self.m_plist_grid.BeginBatch()
         nb_size = self.parent.GetSize()
         total_size = 0
         for x in range(0, 2):
@@ -595,7 +660,6 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         if delta > 0:
             self.m_plist_grid.SetColSize(1, self.m_plist_grid.GetColSize(1) + delta)
         self.m_plist_grid.EndBatch()
-        self.go_cell(self.m_plist_grid, 0, 0)
 
     def update_row(self, count, k, v):
         try:
@@ -629,16 +693,7 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         self.update_plist(JSON_MODIFY, {"table": "global", "index": key, "data": value})
         if key == "background" or key == "foreground":
             self.reshow(row, col)
-        self.m_plist_grid.BeginBatch()
-        nb_size = self.parent.GetSize()
-        total_size = 0
-        for x in range(0, 2):
-            self.m_plist_grid.AutoSizeColumn(x)
-            total_size += self.m_plist_grid.GetColSize(x)
-        delta = nb_size[0] - 20 - total_size
-        if delta > 0:
-            self.m_plist_grid.SetColSize(1, self.m_plist_grid.GetColSize(1) + delta)
-        self.m_plist_grid.EndBatch()
+        self.resize_table()
 
     def delete_row(self):
         row = self.m_plist_grid.GetGridCursorRow()
@@ -697,6 +752,9 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
             grid.GetCellValue(row, 0),
             grid.GetCellValue(row, 1)
         ).ShowModal()
+
+    def on_grid_label_left_click(self, event):
+        return
 
     def on_mouse_motion(self, event):
         self.mouse_motion(event)
@@ -1381,6 +1439,7 @@ class Editor(editor.EditorFrame):
         if set_name != self.last_plist_name:
             self.last_plist_name = set_name
             self.update_plist(JSON_NAME)
+        event.Skip()
 
     def on_uuid_button_click(self, event):
         self.last_UUID = str(uuid.uuid4()).upper()
@@ -1399,29 +1458,11 @@ class Editor(editor.EditorFrame):
             self.on_uuid_button_click(event)
             log.debug("UUID invalid %s!" % self.m_plist_uuid_textbox.GetValue())
             error('UUID is invalid! A new UUID has been generated.')
+        event.Skip()
 
     def on_plist_notebook_size(self, event):
-        nb_size = self.m_plist_notebook.GetSize()
-        grid = self.m_global_settings.m_plist_grid
-        grid.BeginBatch()
-        total_size = 0
-        grid.AutoSizeColumn(1)
-        for x in range(0, 2):
-            total_size += grid.GetColSize(x)
-        delta = nb_size[0] - 20 - total_size
-        if delta > 0:
-            grid.SetColSize(1, grid.GetColSize(1) + delta)
-        grid.EndBatch()
-        grid = self.m_style_settings.m_plist_grid
-        grid.BeginBatch()
-        total_size = 0
-        grid.AutoSizeColumn(4)
-        for x in range(0, 5):
-            total_size += grid.GetColSize(x)
-        delta = nb_size[0] - 20 - total_size
-        if delta > 0:
-            grid.SetColSize(4, grid.GetColSize(4) + delta)
-        grid.EndBatch()
+        self.m_global_settings.resize_table()
+        self.m_style_settings.resize_table()
         event.Skip()
 
     def on_open_new(self, event):

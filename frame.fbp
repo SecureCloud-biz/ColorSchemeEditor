@@ -193,16 +193,16 @@
                                         <property name="border">5</property>
                                         <property name="flag">wxEXPAND</property>
                                         <property name="proportion">1</property>
-                                        <object class="wxBoxSizer" expanded="0">
+                                        <object class="wxBoxSizer" expanded="1">
                                             <property name="minimum_size"></property>
                                             <property name="name">bSizer3</property>
                                             <property name="orient">wxVERTICAL</property>
                                             <property name="permission">none</property>
-                                            <object class="sizeritem" expanded="0">
+                                            <object class="sizeritem" expanded="1">
                                                 <property name="border">5</property>
                                                 <property name="flag">wxEXPAND</property>
                                                 <property name="proportion">1</property>
-                                                <object class="wxFlexGridSizer" expanded="0">
+                                                <object class="wxFlexGridSizer" expanded="1">
                                                     <property name="cols">2</property>
                                                     <property name="flexible_direction">wxBOTH</property>
                                                     <property name="growablecols">1</property>
@@ -471,11 +471,11 @@
                                                             <event name="OnUpdateUI"></event>
                                                         </object>
                                                     </object>
-                                                    <object class="sizeritem" expanded="0">
+                                                    <object class="sizeritem" expanded="1">
                                                         <property name="border">5</property>
                                                         <property name="flag">wxEXPAND</property>
                                                         <property name="proportion">1</property>
-                                                        <object class="wxFlexGridSizer" expanded="0">
+                                                        <object class="wxFlexGridSizer" expanded="1">
                                                             <property name="cols">2</property>
                                                             <property name="flexible_direction">wxBOTH</property>
                                                             <property name="growablecols">0</property>
@@ -751,11 +751,11 @@
                                                             <event name="OnUpdateUI"></event>
                                                         </object>
                                                     </object>
-                                                    <object class="sizeritem" expanded="0">
+                                                    <object class="sizeritem" expanded="1">
                                                         <property name="border">5</property>
                                                         <property name="flag">wxEXPAND</property>
                                                         <property name="proportion">1</property>
-                                                        <object class="wxFlexGridSizer" expanded="0">
+                                                        <object class="wxFlexGridSizer" expanded="1">
                                                             <property name="cols">3</property>
                                                             <property name="flexible_direction">wxBOTH</property>
                                                             <property name="growablecols">0</property>
@@ -1179,6 +1179,21 @@
                     <property name="label">File</property>
                     <property name="name">m_menu_file</property>
                     <property name="permission">protected</property>
+                    <object class="wxMenuItem" expanded="1">
+                        <property name="bitmap"></property>
+                        <property name="checked">0</property>
+                        <property name="enabled">1</property>
+                        <property name="help"></property>
+                        <property name="id">wxID_ANY</property>
+                        <property name="kind">wxITEM_NORMAL</property>
+                        <property name="label">Open</property>
+                        <property name="name">m_menuitem_open</property>
+                        <property name="permission">none</property>
+                        <property name="shortcut"></property>
+                        <property name="unchecked_bitmap"></property>
+                        <event name="OnMenuSelection">on_open_new</event>
+                        <event name="OnUpdateUI"></event>
+                    </object>
                     <object class="wxMenuItem" expanded="0">
                         <property name="bitmap"></property>
                         <property name="checked">0</property>
@@ -1207,21 +1222,6 @@
                         <property name="shortcut"></property>
                         <property name="unchecked_bitmap"></property>
                         <event name="OnMenuSelection">on_save_as</event>
-                        <event name="OnUpdateUI"></event>
-                    </object>
-                    <object class="wxMenuItem" expanded="1">
-                        <property name="bitmap"></property>
-                        <property name="checked">0</property>
-                        <property name="enabled">1</property>
-                        <property name="help"></property>
-                        <property name="id">wxID_ANY</property>
-                        <property name="kind">wxITEM_NORMAL</property>
-                        <property name="label">Open</property>
-                        <property name="name">m_menuitem_open</property>
-                        <property name="permission">none</property>
-                        <property name="shortcut"></property>
-                        <property name="unchecked_bitmap"></property>
-                        <event name="OnMenuSelection">on_open_new</event>
                         <event name="OnUpdateUI"></event>
                     </object>
                 </object>
@@ -1717,7 +1717,7 @@
                                 <event name="OnGridEditorCreated"></event>
                                 <event name="OnGridEditorHidden"></event>
                                 <event name="OnGridEditorShown"></event>
-                                <event name="OnGridLabelLeftClick"></event>
+                                <event name="OnGridLabelLeftClick">on_grid_label_left_click</event>
                                 <event name="OnGridLabelLeftDClick"></event>
                                 <event name="OnGridLabelRightClick"></event>
                                 <event name="OnGridLabelRightDClick"></event>
@@ -2381,7 +2381,7 @@
                                 <event name="OnGridEditorCreated"></event>
                                 <event name="OnGridEditorHidden"></event>
                                 <event name="OnGridEditorShown"></event>
-                                <event name="OnGridLabelLeftClick"></event>
+                                <event name="OnGridLabelLeftClick">on_grid_label_left_click</event>
                                 <event name="OnGridLabelLeftDClick"></event>
                                 <event name="OnGridLabelRightClick"></event>
                                 <event name="OnGridLabelRightDClick"></event>
