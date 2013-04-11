@@ -488,32 +488,20 @@ class StyleSettings(editor.StyleSettingsPanel, GridHelper):
         self.m_plist_grid.GetParent().update_plist(JSON_DELETE, {"table": "style", "index": row})
 
     def insert_row(self):
-        grid = self.m_plist_grid
-        num = grid.GetNumberRows()
-        row = grid.GetGridCursorRow()
-        if num > 0:
-            grid.InsertRows(row, 1, True)
-        else:
-            grid.AppendRows(1)
-            row = 0
-        text = ["New Item", "#FFFFFF", "#000000", "", "comment"]
-        [grid.SetCellValue(row, x, text[x]) for x in range(0, 5)]
         obj = {
-            "name": text[0],
-            "scope": text[4],
+            "name": "New Item",
+            "scope": "comment",
             "settings": {
-                "foreground": text[1],
-                "background": text[2],
-                "fontStyle": text[3]
+                "foreground": "#FFFFFF",
+                "background": "#000000",
+                "fontStyle": ""
             }
         }
-        grid.GetParent().update_row(row, obj)
-        self.go_cell(grid, row, 0)
-        grid.GetParent().update_plist(JSON_ADD, {"table": "style", "index": row, "data": obj})
         editor = self.GetParent().GetParent().GetParent()
         ColorEditor(
             editor,
-            obj
+            obj,
+            insert=True
         ).ShowModal()
 
     def row_up(self):
@@ -714,32 +702,19 @@ class GlobalSettings(editor.GlobalSettingsPanel, GridHelper):
         return valid
 
     def insert_row(self):
-        grid = self.m_plist_grid
-        num = grid.GetNumberRows()
-        row = grid.GetGridCursorRow()
-        if num > 0:
-            grid.InsertRows(row, 1, True)
-        else:
-            grid.AppendRows(1)
-            row = 0
-
         new_name = "new_item"
         count = 0
         while not self.validate_name(new_name):
             new_name = "new_item_%d" % count
             count += 1
 
-        text = [new_name, "nothing"]
-        [grid.SetCellValue(row, x, text[x]) for x in range(0, 2)]
-        grid.GetParent().update_row(row, text[0], text[1])
-        self.go_cell(grid, row, 0)
-        grid.GetParent().update_plist(JSON_ADD, {"table": "global", "index": text[0], "data": text[1]})
         editor = self.GetParent().GetParent().GetParent()
         GlobalEditor(
             editor,
             editor.scheme["settings"][0]["settings"],
-            text[0],
-            text[1]
+            new_name,
+            "nothing",
+            insert=True
         ).ShowModal()
 
     def edit_cell(self):
@@ -785,10 +760,11 @@ class SettingsKeyBindings(object):
     def on_char_hook(self, event):
         if event.GetKeyCode() == wx.WXK_ESCAPE:
             self.Close()
+        event.Skip()
 
 
 class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
-    def __init__(self, parent, current_entries, name, value):
+    def __init__(self, parent, current_entries, name, value, insert=False):
         super(GlobalEditor, self).__init__(parent)
         self.setup_keybindings()
         self.Fit()
@@ -805,6 +781,7 @@ class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
         self.entries = current_entries
         self.current_name = name
         self.valid = True
+        self.insert = bool(insert)
 
         self.m_name_textbox.SetValue(self.obj_key)
         try:
@@ -925,17 +902,32 @@ class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
             self.m_name_textbox.SetValue(self.current_name)
 
     def on_set_color_close(self, event):
+        self.obj_key = self.m_name_textbox.GetValue()
+        self.current_name = self.obj_key
+
         if self.apply_settings:
-            self.obj_key = self.m_name_textbox.GetValue()
             self.obj_val = self.m_value_textbox.GetValue()
 
-            self.Parent.set_global_object(self.obj_key, self.obj_val)
+            if self.insert:
+                grid = self.Parent.m_global_settings.m_plist_grid
+                num = grid.GetNumberRows()
+                row = grid.GetGridCursorRow()
+                if num > 0:
+                    grid.InsertRows(row, 1, True)
+                else:
+                    grid.AppendRows(1)
+                    row = 0
+                grid.GetParent().update_row(row, self.obj_key, self.obj_val)
+                grid.GetParent().go_cell(grid, row, 0)
+                self.Parent.update_plist(JSON_ADD, {"table": "global", "index": self.obj_key, "data": self.obj_val})
+            else:
+                self.Parent.set_global_object(self.obj_key, self.obj_val)
 
         event.Skip()
 
 
 class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
-    def __init__(self, parent, obj):
+    def __init__(self, parent, obj, insert=False):
         super(ColorEditor, self).__init__(parent)
         self.setup_keybindings()
         self.Fit()
@@ -947,6 +939,7 @@ class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
         self.background_save = ""
         self.apply_settings = False
         self.color_obj = obj
+        self.insert = bool(insert)
 
         self.m_bold_checkbox.SetValue(False)
         self.m_italic_checkbox.SetValue(False)
@@ -1133,7 +1126,20 @@ class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
                 }
             }
 
-            self.Parent.set_style_object(self.color_obj)
+            if self.insert:
+                grid = self.Parent.m_style_settings.m_plist_grid
+                num = grid.GetNumberRows()
+                row = grid.GetGridCursorRow()
+                if num > 0:
+                    grid.InsertRows(row, 1, True)
+                else:
+                    grid.AppendRows(1)
+                    row = 0
+                grid.GetParent().update_row(row, self.color_obj)
+                grid.GetParent().go_cell(grid, row, 0)
+                self.Parent.update_plist(JSON_ADD, {"table": "style", "index": row, "data": self.color_obj})
+            else:
+                self.Parent.set_style_object(self.color_obj)
         event.Skip()
 
 
