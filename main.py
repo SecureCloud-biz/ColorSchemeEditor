@@ -20,6 +20,8 @@ from _lib.default_new_theme import theme as default_new_theme
 from time import sleep, time
 import threading
 
+WX28 = wx.__version__.startswith('2.8')
+
 __version__ = "0.0.7"
 
 BG_COLOR = None
@@ -244,7 +246,7 @@ class GridHelper(object):
         self.SetAcceleratorTable(accel_tbl)
 
     def go_cell(self, grid, row, col, focus=False):
-        if focus:
+        if focus and not WX28:
             grid.GoToCell(row, col)
         else:
             grid.SetGridCursor(row, col)
@@ -267,7 +269,7 @@ class GridHelper(object):
             # Eat...NOM NOM
             if event.GetKeyCode() == wx.WXK_UP:
                 return
-            elif event.GetKeyCode() == wx.WXK_UP:
+            elif event.GetKeyCode() == wx.WXK_DOWN:
                 return
             elif event.GetKeyCode() == wx.WXK_LEFT:
                 return
@@ -293,6 +295,7 @@ class GridHelper(object):
             self.current_col = event.GetCol()
             self.go_cell(grid, self.current_row, self.current_col)
             self.cell_select_semaphore = False
+        event.Skip()
 
     def on_panel_left(self, event):
         grid = self.m_plist_grid
@@ -1216,7 +1219,7 @@ class Editor(editor.EditorFrame):
             self.update_thread = LiveUpdate(self.save, self.queue)
             self.update_thread.start()
 
-    def update_plist(self, code, args):
+    def update_plist(self, code, args={}):
         if code == JSON_UUID:
             self.scheme["uuid"] = self.m_plist_uuid_textbox.GetValue()
             self.updates_made = True
@@ -1583,7 +1586,8 @@ def filepicker(parent, msg, wildcard, save=False):
 
 def yesno(parent, question, caption = 'Yes or no?', yes="Okay", no="Cancel"):
     dlg = wx.MessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
-    dlg.SetYesNoLabels(yes, no)
+    if not WX28:
+        dlg.SetYesNoLabels(yes, no)
     result = dlg.ShowModal() == wx.ID_YES
     dlg.Destroy()
     return result
