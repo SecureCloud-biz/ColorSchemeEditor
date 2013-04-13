@@ -20,9 +20,7 @@ from _lib.default_new_theme import theme as default_new_theme
 from time import sleep, time
 import threading
 
-WX28 = wx.__version__.startswith('2.8')
-
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 
 BG_COLOR = None
 FG_COLOR = None
@@ -69,6 +67,19 @@ Insert Row: Control + I
 Toggle 'bold' font: B
 Toggle 'italic' font: I
 Toggle 'underlined' font: U
+''',
+
+    "linux": u'''
+===Applicatioon Shortcuts===
+Find Next: Control + F
+Find Next: Control + G
+Find Prev: Control + Shift + G
+Save: Control + S
+Save As: Control + Shift + S
+
+===Table Shortcuts===
+Delete Row: Delete
+Insert Row: Control + I
 '''
 }
 
@@ -239,14 +250,15 @@ class GridHelper(object):
                 (wx.ACCEL_NORMAL, ord('U'), underlineid),
                 (wx.ACCEL_ALT, wx.WXK_LEFT, panellid ),
                 (wx.ACCEL_ALT, wx.WXK_RIGHT, panelrid),
-                (wx.ACCEL_ALT, wx.WXK_UP, rowupid ),
-                (wx.ACCEL_ALT, wx.WXK_DOWN, rowdownid)
-            ] + ([(wx.ACCEL_CMD, ord('I'), insertid )] if sys.platform == "darwin" else [(wx.ACCEL_CTRL, ord('I'), insertid )])
+                (wx.ACCEL_ALT, wx.WXK_UP, rowupid),
+                (wx.ACCEL_ALT, wx.WXK_DOWN, rowdownid),
+                (wx.ACCEL_CMD, ord('I'), insertid ) if sys.platform == "darwin" else (wx.ACCEL_CTRL, ord('I'), insertid )
+            ]
         )
         self.SetAcceleratorTable(accel_tbl)
 
     def go_cell(self, grid, row, col, focus=False):
-        if focus and not WX28:
+        if focus:
             grid.GoToCell(row, col)
         else:
             grid.SetGridCursor(row, col)
@@ -1540,7 +1552,12 @@ class Editor(editor.EditorFrame):
         self.find_prev()
 
     def on_shortcuts(self, event):
-        msg = SHORTCUTS["osx"] if sys.platform == "darwin" else SHORTCUTS["windows"]
+        if sys.platform == "darwin":
+            msg = SHORTCUTS["osx"]
+        elif sys.platform == "linux2":
+            msg = SHORTCUTS["linux"]
+        else:
+            msg = SHORTCUTS["windows"]
         info(msg,"Shortcuts")
 
     def on_debug_console(self, event):
@@ -1586,8 +1603,7 @@ def filepicker(parent, msg, wildcard, save=False):
 
 def yesno(parent, question, caption = 'Yes or no?', yes="Okay", no="Cancel"):
     dlg = wx.MessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
-    if not WX28:
-        dlg.SetYesNoLabels(yes, no)
+    dlg.SetYesNoLabels(yes, no)
     result = dlg.ShowModal() == wx.ID_YES
     dlg.Destroy()
     return result
