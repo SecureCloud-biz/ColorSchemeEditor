@@ -78,8 +78,16 @@ Save: Control + S
 Save As: Control + Shift + S
 
 ===Table Shortcuts===
+Edit Row: Enter
+Move Row Up (Style Settings): Alt + ↑
+Move Row Down (Style Settings): Alt + ↓
+Switch to Global Settings: Alt + ←
+Switch to Style Settings: Alt + →
 Delete Row: Delete
 Insert Row: Control + I
+Toggle 'bold' font: B
+Toggle 'italic' font: I
+Toggle 'underlined' font: U
 '''
 }
 
@@ -221,37 +229,13 @@ class GridHelper(object):
     def setup_keybindings(self):
         deleteid = wx.NewId()
         insertid = wx.NewId()
-        panellid = wx.NewId()
-        panelrid = wx.NewId()
-        editid = wx.NewId()
-        rowupid = wx.NewId()
-        rowdownid = wx.NewId()
-        boldid = wx.NewId()
-        italicid = wx.NewId()
-        underlineid = wx.NewId()
 
         self.Bind(wx.EVT_MENU, self.on_delete_row, id=deleteid)
         self.Bind(wx.EVT_MENU, self.on_insert_row, id=insertid)
-        self.Bind(wx.EVT_MENU, self.on_panel_left, id=panellid)
-        self.Bind(wx.EVT_MENU, self.on_panel_right, id=panelrid)
-        self.Bind(wx.EVT_MENU, self.on_row_up, id=rowupid)
-        self.Bind(wx.EVT_MENU, self.on_row_down, id=rowdownid)
-        self.Bind(wx.EVT_MENU, self.on_edit_cell, id=editid)
-        self.Bind(wx.EVT_MENU, self.on_toggle_bold, id=boldid)
-        self.Bind(wx.EVT_MENU, self.on_toggle_italic, id=italicid)
-        self.Bind(wx.EVT_MENU, self.on_toggle_underline, id=underlineid)
 
         accel_tbl = wx.AcceleratorTable(
             [
-                (wx.ACCEL_NORMAL, wx.WXK_RETURN, editid),
                 (wx.ACCEL_NORMAL, wx.WXK_DELETE, deleteid),
-                (wx.ACCEL_NORMAL, ord('B'), boldid),
-                (wx.ACCEL_NORMAL, ord('I'), italicid),
-                (wx.ACCEL_NORMAL, ord('U'), underlineid),
-                (wx.ACCEL_ALT, wx.WXK_LEFT, panellid ),
-                (wx.ACCEL_ALT, wx.WXK_RIGHT, panelrid),
-                (wx.ACCEL_ALT, wx.WXK_UP, rowupid),
-                (wx.ACCEL_ALT, wx.WXK_DOWN, rowdownid),
                 (wx.ACCEL_CMD, ord('I'), insertid ) if sys.platform == "darwin" else (wx.ACCEL_CTRL, ord('I'), insertid )
             ]
         )
@@ -277,7 +261,33 @@ class GridHelper(object):
             event.Skip()           # no dragging, pass on to the window
 
     def grid_key_down(self, event):
-        if event.AltDown():
+        no_modifiers = event.GetModifiers() == 0
+        alt_mod = event.GetModifiers() == wx.MOD_ALT
+        if no_modifiers and event.GetKeyCode() == ord('B'):
+            self.toggle_bold()
+            return
+        elif no_modifiers and event.GetKeyCode() == ord('I'):
+            self.toggle_italic()
+            return
+        elif no_modifiers and event.GetKeyCode() == ord('U'):
+            self.toggle_underline()
+            return
+        elif no_modifiers and event.GetKeyCode() == wx.WXK_RETURN:
+            self.edit_cell()
+            return
+        elif alt_mod and event.GetKeyCode() == wx.WXK_UP:
+            self.row_up()
+            return
+        elif alt_mod and event.GetKeyCode() == wx.WXK_DOWN:
+            self.row_down()
+            return
+        elif alt_mod and event.GetKeyCode() == wx.WXK_LEFT:
+            self.on_panel_left(event)
+            return
+        elif alt_mod and event.GetKeyCode() == wx.WXK_RIGHT:
+            self.on_panel_right(event)
+            return
+        elif event.AltDown():
             # Eat...NOM NOM
             if event.GetKeyCode() == wx.WXK_UP:
                 return
