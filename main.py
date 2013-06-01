@@ -15,10 +15,10 @@ import editor
 from _lib.rgba import RGBA
 import uuid
 from os.path import exists, normpath, join, dirname, abspath, basename
-import _lib.simplelog as Log
 from _lib.default_new_theme import theme as default_new_theme
 from time import sleep, time
 import threading
+from _lib.custom_app import CustomApp, DebugFrameExtender, init_app_log, set_debug_mode, set_debug_console, get_debug_mode, get_debug_console, debug, info, warning, critical, error
 
 __version__ = "0.0.8"
 
@@ -97,43 +97,6 @@ JSON_MODIFY = 3
 JSON_MOVE = 4
 JSON_UUID = 5
 JSON_NAME = 6
-
-#################################################
-# Debug and Logging
-#################################################
-log = None
-
-
-def log_gui(msg):
-    log.info(msg, "%(message)s", echo=False)
-
-
-class CustomLog(wx.PyOnDemandOutputWindow):
-    def write(self, text):
-        if self.frame is None:
-            if not wx.Thread_IsMain():
-                wx.CallAfter(log_gui, text)
-                if DEBUG_CONSOLE:
-                    wx.CallAfter(self.CreateOutputWindow, text)
-            else:
-                log_gui(text)
-                if DEBUG_CONSOLE:
-                    self.CreateOutputWindow(text)
-        else:
-            if not wx.Thread_IsMain():
-                wx.CallAfter(log_gui, text)
-                if DEBUG_CONSOLE:
-                    wx.CallAfter(self.text.AppendText, text)
-            else:
-                log_gui(text)
-                if DEBUG_CONSOLE:
-                    self.text.AppendText(text)
-
-
-class CustomApp(wx.App):
-    def __init__(self, *args, **kwargs):
-        self.outputWindowClass = CustomLog
-        super(CustomApp, self).__init__(*args, **kwargs)
 
 
 #################################################
@@ -882,7 +845,7 @@ class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
 
     def on_global_name_blur(self, event):
         if not self.is_name_valid():
-            error("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
+            errormsg("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
             self.m_name_textbox.SetValue(self.current_name)
         else:
             self.current_name = self.m_name_textbox.GetValue()
@@ -929,7 +892,7 @@ class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
             self.apply_settings = True
             self.Close()
         else:
-            error("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
+            errormsg("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
             self.m_name_textbox.SetValue(self.current_name)
 
     def on_set_color_close(self, event):
@@ -1177,7 +1140,7 @@ class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
 #################################################
 # Editor Dialog
 #################################################
-class Editor(editor.EditorFrame):
+class Editor(editor.EditorFrame, DebugFrameExtender):
     def __init__(self, parent, scheme, j_file, t_file, live_save, debugging=False):
         super(Editor, self).__init__(parent)
         findid = wx.NewId()
@@ -1188,27 +1151,20 @@ class Editor(editor.EditorFrame):
         scid = wx.NewId()
         self.live_save = bool(live_save)
         self.updates_made = False
-        if debugging:
-            debugid= wx.NewId()
-            self.Bind(wx.EVT_MENU, self.on_debug_console, id=debugid)
-        self.Bind(wx.EVT_MENU, self.on_shortcuts, id=scid)
-        self.Bind(wx.EVT_MENU, self.on_save_as, id=saveasid)
-        self.Bind(wx.EVT_MENU, self.on_save, id=saveid)
-        self.Bind(wx.EVT_MENU, self.focus_find, id=findid)
-        self.Bind(wx.EVT_MENU, self.on_next_find, id=findnextid)
-        self.Bind(wx.EVT_MENU, self.on_prev_find, id=findprevid)
         mod = wx.ACCEL_CMD if sys.platform == "darwin" else wx.ACCEL_CTRL
-        accel_tbl = wx.AcceleratorTable(
+        self.set_keybindings(
             [
-                (mod, ord('B'), scid),
-                (mod|wx.ACCEL_SHIFT, ord('S'), saveasid),
-                (mod, ord('S'), saveid),
-                (mod,  ord('F'), findid ),
-                (mod, ord('G'), findnextid),
-                (mod|wx.ACCEL_SHIFT, ord('G'), findprevid)
-            ] + ([(mod, ord('`'), debugid)] if debugging else [])
+                (mod, ord('B'), self.on_shortcuts),
+                (mod|wx.ACCEL_SHIFT, ord('S'), self.on_save_as),
+                (mod, ord('S'), self.on_save),
+                (mod,  ord('F'), self.focus_find ),
+                (mod, ord('G'), self.on_next_find),
+                (mod|wx.ACCEL_SHIFT, ord('G'), self.on_prev_find)
+            ],
+            self.on_debug_console if debugging else None
         )
-        self.SetAcceleratorTable(accel_tbl)
+        if debugging:
+            self.open_debug_console()
         self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
         self.search_results = []
         self.cur_search = None
@@ -1217,14 +1173,14 @@ class Editor(editor.EditorFrame):
         self.scheme = scheme
         self.json = j_file
         self.tmtheme = t_file
-        log.debug(scheme, fmt=lambda x: json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')))
+        debug(scheme, fmt=lambda x: json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')))
 
         try:
             self.m_global_settings = GlobalSettings(self.m_plist_notebook, scheme, self.update_plist, self.rebuild_tables)
             self.m_style_settings = StyleSettings(self.m_plist_notebook, scheme, self.update_plist)
         except Exception as e:
-            log.debug("Failed to load scheme settings!")
-            log.debug(e)
+            debug("Failed to load scheme settings!")
+            debug(e)
             raise
 
         self.m_plist_name_textbox.SetValue(scheme["name"])
@@ -1249,21 +1205,21 @@ class Editor(editor.EditorFrame):
             self.scheme["name"] = self.m_plist_name_textbox.GetValue()
             self.updates_made = True
         elif code == JSON_ADD and args is not None:
-            log.debug("JSON add")
+            debug("JSON add")
             if args["table"] == "style":
                 self.scheme["settings"].insert(args["index"] + 1, args["data"])
             else:
                 self.scheme["settings"][0]["settings"][args["index"]] = args["data"]
             self.updates_made = True
         elif code == JSON_DELETE and args is not None:
-            log.debug("JSON delete")
+            debug("JSON delete")
             if args["table"] == "style":
                 del self.scheme["settings"][args["index"] + 1]
             else:
                 del self.scheme["settings"][0]["settings"][args["index"]]
             self.updates_made = True
         elif code == JSON_MOVE and args is not None:
-            log.debug("JSON move")
+            debug("JSON move")
             from_row = args["from"] + 1
             to_row = args["to"] + 1
             item = self.scheme["settings"][from_row]
@@ -1271,7 +1227,7 @@ class Editor(editor.EditorFrame):
             self.scheme["settings"].insert(to_row, item)
             self.updates_made = True
         elif code == JSON_MODIFY and args is not None:
-            log.debug("JSON modify")
+            debug("JSON modify")
             if args["table"] == "style":
                 obj = {
                     "name": args["data"]["name"],
@@ -1296,7 +1252,7 @@ class Editor(editor.EditorFrame):
                 self.scheme["settings"][0]["settings"][args["index"]] = args["data"]
             self.updates_made = True
         else:
-            log.debug("No valid edit actions!")
+            debug("No valid edit actions!")
 
         if self.live_save:
             while not self.update_thread.lock_queue():
@@ -1347,14 +1303,14 @@ class Editor(editor.EditorFrame):
             self.update_thread.release_queue()
 
     def save(self, request, requester="Main Thread"):
-        log.debug("%s requested save - %s" % (requester, request))
+        debug("%s requested save - %s" % (requester, request))
         if request == "tmtheme" or request == "all":
             try:
                 with codec_open(self.tmtheme, "w", "utf-8") as f:
                     f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
             except:
-                log.debug("tmTheme file write error!")
-                error('Unexpected problem trying to write .tmTheme file!')
+                debug("tmTheme file write error!")
+                errormsg('Unexpected problem trying to write .tmTheme file!')
 
         if request == "json" or request == "all":
             try:
@@ -1364,8 +1320,8 @@ class Editor(editor.EditorFrame):
                 if not self.live_save:
                     self.m_menuitem_save.Enable(False)
             except:
-                log.debug("JSON file write error!")
-                error('Unexpected problem trying to write .tmTheme.JSON file!')
+                debug("JSON file write error!")
+                errormsg('Unexpected problem trying to write .tmTheme.JSON file!')
 
 
     def rebuild_tables(self, cur_row, cur_col):
@@ -1412,7 +1368,7 @@ class Editor(editor.EditorFrame):
     def find_next(self, current=False):
         panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
         if self.cur_search is not panel:
-            log.debug("Find: Panel switched.  Upate results.")
+            debug("Find: Panel switched.  Upate results.")
             self.find()
         grid = panel.m_plist_grid
         row = grid.GetGridCursorRow()
@@ -1437,7 +1393,7 @@ class Editor(editor.EditorFrame):
     def find_prev(self, current=False):
         panel = self.m_style_settings if self.m_plist_notebook.GetSelection() else self.m_global_settings
         if self.cur_search is not panel:
-            log.debug("Find: Panel switched.  Upate results.")
+            debug("Find: Panel switched.  Upate results.")
             self.find()
         grid = panel.m_plist_grid
         row = grid.GetGridCursorRow()
@@ -1493,8 +1449,8 @@ class Editor(editor.EditorFrame):
                 self.update_plist(JSON_UUID)
         except:
             self.on_uuid_button_click(event)
-            log.debug("UUID invalid %s!" % self.m_plist_uuid_textbox.GetValue())
-            error('UUID is invalid! A new UUID has been generated.')
+            debug("UUID invalid %s!" % self.m_plist_uuid_textbox.GetValue())
+            errormsg('UUID is invalid! A new UUID has been generated.')
         event.Skip()
 
     def on_plist_notebook_size(self, event):
@@ -1545,7 +1501,7 @@ class Editor(editor.EditorFrame):
             self.save("all")
 
     def on_about(self, event):
-        info("Color Scheme Editor: version %s" % __version__)
+        infomsg("Color Scheme Editor: version %s" % __version__)
         event.Skip()
 
     def on_find(self, event):
@@ -1568,28 +1524,13 @@ class Editor(editor.EditorFrame):
             msg = SHORTCUTS["linux"]
         else:
             msg = SHORTCUTS["windows"]
-        info(msg,"Shortcuts")
+        infomsg(msg,"Shortcuts")
 
     def on_debug_console(self, event):
-        global DEBUG_CONSOLE
-        DEBUG_CONSOLE = not DEBUG_CONSOLE
-        if DEBUG_CONSOLE:
-            log.set_echo(True)
-            log.debug("**Debug Console Opened**")
-        else:
-            log.debug("**Debug Console Closed**")
-            log.set_echo(False)
-            if app.stdioWin is not None:
-                app.stdioWin.close()
+        self.open_debug_console()
 
     def on_close(self, event):
-        global DEBUG_CONSOLE
-        if DEBUG_CONSOLE:
-            log.debug("**Debug Console Closed**")
-            DEBUG_CONSOLE = False
-            log.set_echo(False)
-            if app.stdioWin is not None:
-                app.stdioWin.close()
+        self.close_debug_console()
         self.file_close_cleanup()
         event.Skip()
 
@@ -1619,11 +1560,11 @@ def yesno(parent, question, caption = 'Yes or no?', yes="Okay", no="Cancel"):
     return result
 
 
-def info(msg, title="INFO"):
+def infomsg(msg, title="INFO"):
     wx.MessageBox(msg, title, wx.OK | wx.ICON_INFORMATION)
 
 
-def error(msg, title="ERROR"):
+def errormsg(msg, title="ERROR"):
     wx.MessageBox(msg, title, wx.OK | wx.ICON_ERROR)
 
 
@@ -1648,20 +1589,20 @@ def query_user_for_file(action):
         if select:
             result = filepicker(None, "Choose a theme file:", wildcard)
             if result is not None:
-                log.debug(result)
+                debug(result)
                 if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
-                    error("File must be of type '.tmtheme' or '.tmtheme.json'")
-                    log.debug("Select: Bad extension: %s" % result)
+                    errormsg("File must be of type '.tmtheme' or '.tmtheme.json'")
+                    debug("Select: Bad extension: %s" % result)
                     continue
                 file_path = result
-                log.debug("Select: File selected: %s" % file_path)
+                debug("Select: File selected: %s" % file_path)
             done = True
         else:
             result = filepicker(None, "Theme file to save:", wildcard, True)
             if result is not None:
                 if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
-                    error("File must be of type '.tmtheme' or '.tmtheme.json'")
-                    log.debug("New: Bad extension: %s" % result)
+                    errormsg("File must be of type '.tmtheme' or '.tmtheme.json'")
+                    debug("New: Bad extension: %s" % result)
                     continue
                 if result.lower().endswith("tmtheme.json"):
                     with codec_open(result, "w", "utf-8") as f:
@@ -1670,7 +1611,7 @@ def query_user_for_file(action):
                     with codec_open(result, "w", "utf-8") as f:
                         f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
                 file_path = result
-                log.debug("New: File selected: %s" % file_path)
+                debug("New: File selected: %s" % file_path)
             done = True
     return file_path
 
@@ -1684,8 +1625,8 @@ def parse_file(file_path):
         with open(file_path, "r") as f:
             color_scheme = json.loads(sanitize_json(f.read(), True)) if is_json else readPlist(f)
     except:
-        log.debug("Parse theme error!")
-        error('Unexpected problem trying to parse file!')
+        debug("Parse theme error!")
+        errormsg('Unexpected problem trying to parse file!')
 
     if color_scheme is not None:
         if is_json:
@@ -1697,7 +1638,7 @@ def parse_file(file_path):
                     with codec_open(t_file, "w", "utf-8") as f:
                         f.write((writePlistToString(color_scheme) + '\n').decode('utf8'))
                 except:
-                    log.debug("tmTheme file write error!")
+                    debug("tmTheme file write error!")
         else:
             j_file = file_path + ".JSON"
             t_file = file_path
@@ -1707,7 +1648,7 @@ def parse_file(file_path):
                     with codec_open(j_file, "w", "utf-8") as f:
                         f.write((json.dumps(color_scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
                 except:
-                    log.debug("JSON file write error!")
+                    debug("JSON file write error!")
 
     return j_file, t_file, color_scheme
 
@@ -1732,8 +1673,6 @@ def parse_arguments(script):
 # Main
 #################################################
 def main(script):
-    global log
-    global app
     cs = None
     j_file = None
     t_file = None
@@ -1741,13 +1680,14 @@ def main(script):
 
     if exists(args.log):
         args.log = join(normpath(args.log), 'subclrschm.log')
-    level = Log.DEBUG if args.debug else Log.INFO
 
-    log = Log.Log(format='%(message)s', filename=args.log, level=level, filemode="w")
-    log.debug('Starting ColorSchemeEditor')
-    log.debug('Arguments = %s' % str(args))
+    init_app_log(args.log)
+    if args.debug:
+        set_debug_mode(True)
+    debug('Starting ColorSchemeEditor')
+    debug('Arguments = %s' % str(args))
 
-    app = CustomApp(redirect=True)
+    app = CustomApp(redirect=args.debug)  #  , single_instance_name="subclrschm")
 
     if args.file is None:
         action = ""
@@ -1763,7 +1703,7 @@ def main(script):
     if j_file is not None and t_file is not None:
         main_win = Editor(None, cs, j_file, t_file, live_save=args.live_save, debugging=args.debug)
         main_win.Show()
-        app.MainLoop()
+        wx.GetApp().MainLoop()
     return 0
 
 

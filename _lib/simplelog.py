@@ -5,6 +5,8 @@ Copyright (c) 2013 Isaac Muse <isaacmuse@gmail.com>
 
 Not thread safe, probably need to fix that
 """
+import codecs
+
 ALL = 0
 DEBUG = 10
 INFO = 20
@@ -15,7 +17,7 @@ CRITICAL = 50
 class Log(object):
     def __init__(self, filename=None, format="%(message)s", level=ERROR, filemode="w"):
         if filemode == "w":
-            with open(filename, "w") as f:
+            with codecs.open(filename, "w", "utf-8") as f:
                 pass
         self.filename = filename
         self.level = level
@@ -29,6 +31,9 @@ class Log(object):
 
     def set_level(self, level):
         self.level = int(level)
+
+    def get_level(self):
+        return self.level
 
     def formater(self, lvl, format, msg, fmt=None):
         return format % {
@@ -58,7 +63,25 @@ class Log(object):
 
     def _log(self, msg, echo=True):
         if not (echo and self.echo) and self.save_to_file:
-            with open(self.filename, "a") as f:
+            with codecs.open(self.filename, "a", "utf-8") as f:
                 f.write(self.format % {"message": msg})
         if echo and self.echo:
             print(self.format % {"message": msg})
+
+    def read(self):
+        txt = ""
+        try:
+            with codecs.open(self.filename, "r", "utf-8") as f:
+                txt = f.read()
+        except:
+            pass
+        return txt
+
+
+def init_global_log(file_name, level=ERROR):
+    global global_log
+    global_log = Log(file_name, level=level)
+
+
+def get_global_log():
+    return global_log
