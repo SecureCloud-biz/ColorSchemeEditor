@@ -14,17 +14,23 @@ import wx
 import editor
 from _lib.rgba import RGBA
 import uuid
-from os.path import exists, normpath, join, dirname, abspath, basename
+from os.path import exists, normpath, join, dirname, abspath, basename, isdir
+from os import listdir, walk
 from _lib.default_new_theme import theme as default_new_theme
 from time import sleep, time
 import threading
 from _lib.custom_app import CustomApp, DebugFrameExtender, init_app_log, set_debug_mode, set_debug_console, get_debug_mode, get_debug_console, debug, info, warning, critical, error
+import zipfile
+from fnmatch import fnmatch
+import re
 
-__version__ = "0.0.8"
+__version__ = "0.0.9"
 
 BG_COLOR = None
 FG_COLOR = None
 DEBUG_CONSOLE = False
+
+SUBLIME_PATHS = None
 
 SHORTCUTS = {
     "osx": u'''
@@ -1567,6 +1573,128 @@ def errormsg(msg, title="ERROR"):
     wx.MessageBox(msg, title, wx.OK | wx.ICON_ERROR)
 
 
+def strip_package_ext(pth):
+    return pth[:-16] if pth.lower().endswith(".sublime-package") else pth
+
+
+def sublime_format_path(pth):
+    m = re.match(r"^([A-Za-z]{1}):(?:/|\\)(.*)", pth)
+    if sys.platform.startswith('win') and m != None:
+        pth = m.group(1) + "/" + m.group(2)
+    return pth.replace("\\", "/")
+
+
+def packages_path():
+    return SUBLIME_PATHS[2] if SUBLIME_PATHS is not None else None
+
+
+def installed_packages_path():
+    return SUBLIME_PATHS[1] if SUBLIME_PATHS is not None else None
+
+
+def default_packages_path():
+    return SUBLIME_PATHS[0] if SUBLIME_PATHS is not None else None
+
+
+class SublimeColorSchemeFiles(object):
+    theme_files = {"pattern": "*.tmTheme", "regex": False}
+
+    def find_files(self, files, pattern, settings, regex):
+        for f in files:
+            if regex:
+                if re.match(pattern, f[0], re.IGNORECASE) != None:
+                    settings.append([f[0].replace(self.packages, "").lstrip("\\").lstrip("/"), f[1]])
+            else:
+                if fnmatch(f[0], pattern):
+                    settings.append([f[0].replace(self.packages, "").lstrip("\\").lstrip("/"), f[1]])
+
+    def walk(self, settings, plugin, pattern, regex=False):
+        for base, dirs, files in walk(plugin):
+            files = [(join(base, f), "Packages") for f in files]
+            self.find_files(files, pattern, settings, regex)
+
+    def get_zip_packages(self, file_path, package_type):
+        for item in listdir(file_path):
+            if fnmatch(item, "*.sublime-package"):
+                yield (join(file_path, item), package_type)
+
+    def search_zipped_files(self, unpacked):
+        installed = []
+        default = []
+        st_packages = [installed_packages_path(), default_packages_path()]
+        unpacked_path = sublime_format_path(self.packages)
+        default_path = sublime_format_path(st_packages[1])
+        installed_path = sublime_format_path(st_packages[0])
+        for p in self.get_zip_packages(st_packages[0], "Installed"):
+            name = strip_package_ext(sublime_format_path(p[0]).replace(installed_path, ""))
+            keep = True
+            for i in unpacked:
+                if name == sublime_format_path(i).replace(unpacked_path, ""):
+                    keep = False
+                    break
+            if keep:
+                installed.append(p)
+
+        for p in self.get_zip_packages(st_packages[1], "Default"):
+            name = strip_package_ext(sublime_format_path(p[0]).replace(default_path, ""))
+            keep = True
+            for i in installed:
+                if name == strip_package_ext(sublime_format_path(i[0]).replace(installed_path, "")):
+                    keep = False
+                    break
+            for i in unpacked:
+                if name == strip_package_ext(sublime_format_path(i[0]).replace(unpacked_path, "")):
+                    keep = False
+                    break
+            if keep:
+                default.append(p)
+        return sorted(default) + sorted(installed)
+
+    def walk_zip(self, settings, plugin, pattern, regex):
+        with zipfile.ZipFile(plugin[0], 'r') as z:
+            zipped = [(join(strip_package_ext(basename(plugin[0])), normpath(fn)), plugin[1]) for fn in sorted(z.namelist())]
+            self.find_files(zipped, pattern, settings, regex)
+
+    def run(self, edit=True):
+        self.edit = edit
+        pattern = self.theme_files["pattern"]
+        regex = bool(self.theme_files["regex"])
+        self.packages = normpath(packages_path())
+        settings = []
+        plugins = sorted([join(self.packages, item) for item in listdir(self.packages) if isdir(join(self.packages, item))])
+        for plugin in plugins:
+            self.walk(settings, plugin, pattern.strip(), regex)
+
+        self.zipped_idx = len(settings)
+
+        zipped_plugins = self.search_zipped_files(plugins)
+        for plugin in zipped_plugins:
+            self.walk_zip(settings, plugin, pattern.strip(), regex)
+
+        return settings
+
+
+    # def open_zip_file(self, fn):
+    #     file_name = None
+    #     zip_package = None
+    #     zip_file = None
+    #     for zp in sublime_package_paths():
+    #         items = fn.replace('\\', '/').split('/')
+    #         zip_package = items.pop(0)
+    #         zip_file = '/'.join(items)
+    #         if exists(join(zp, zip_package)):
+    #             zip_package = join(zp, zip_package)
+    #             file_name = join(zp, fn)
+    #             break
+
+    #     if file_name is not None:
+    #         with zipfile.ZipFile(zip_package, 'r') as z:
+    #             text = z.read(z.getinfo(zip_file))
+    #             view = self.window.open_file(file_name)
+    #             WriteArchivedPackageContentCommand.bfr = text.decode('utf-8').replace('\r', '')
+    #             sublime.set_timeout(lambda: view.run_command("write_archived_package_content"), 0)
+
+
 #################################################
 # Helper Functions
 #################################################
@@ -1658,6 +1786,7 @@ def parse_arguments(script):
     parser.add_argument('--debug', '-d', action='store_true', default=False, help=argparse.SUPPRESS)
     parser.add_argument('--log', '-l', nargs='?', default=script, help="Absolute path to directory to store log file")
     parser.add_argument('--live_save', '-L', action='store_true', default=False, help="Enable live save.")
+    parser.add_argument('--sublime_paths', nargs=3, default=None, help="Sublime plugin paths (3): Default Installed User")
     # Mutually exclusinve flags
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--select', '-s', action='store_true', default=False, help="Prompt for theme selection")
@@ -1684,6 +1813,14 @@ def main(script):
         set_debug_mode(True)
     debug('Starting ColorSchemeEditor')
     debug('Arguments = %s' % str(args))
+
+    if args.sublime_paths is not None:
+        global SUBLIME_PATHS
+        SUBLIME_PATHS = [args.sublime_paths[0], args.sublime_paths[1], args.sublime_paths[2]]
+        try:
+            debug(SublimeColorSchemeFiles().run())
+        except Exception as e:
+            error(e)
 
     app = CustomApp(redirect=args.debug)  #  , single_instance_name="subclrschm")
 
