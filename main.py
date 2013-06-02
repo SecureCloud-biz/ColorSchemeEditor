@@ -1309,7 +1309,6 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
                 with codec_open(self.tmtheme, "w", "utf-8") as f:
                     f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
             except:
-                debug("tmTheme file write error!")
                 errormsg('Unexpected problem trying to write .tmTheme file!')
 
         if request == "json" or request == "all":
@@ -1320,7 +1319,6 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
                 if not self.live_save:
                     self.m_menuitem_save.Enable(False)
             except:
-                debug("JSON file write error!")
                 errormsg('Unexpected problem trying to write .tmTheme.JSON file!')
 
 
@@ -1449,8 +1447,8 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
                 self.update_plist(JSON_UUID)
         except:
             self.on_uuid_button_click(event)
-            debug("UUID invalid %s!" % self.m_plist_uuid_textbox.GetValue())
             errormsg('UUID is invalid! A new UUID has been generated.')
+            debug("Bad UUID: %s!" % self.m_plist_uuid_textbox.GetValue())
         event.Skip()
 
     def on_plist_notebook_size(self, event):
@@ -1565,6 +1563,7 @@ def infomsg(msg, title="INFO"):
 
 
 def errormsg(msg, title="ERROR"):
+    error(msg)
     wx.MessageBox(msg, title, wx.OK | wx.ICON_ERROR)
 
 
@@ -1625,7 +1624,6 @@ def parse_file(file_path):
         with open(file_path, "r") as f:
             color_scheme = json.loads(sanitize_json(f.read(), True)) if is_json else readPlist(f)
     except:
-        debug("Parse theme error!")
         errormsg('Unexpected problem trying to parse file!')
 
     if color_scheme is not None:
