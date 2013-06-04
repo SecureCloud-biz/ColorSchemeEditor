@@ -15,6 +15,25 @@ DEBUG_CONSOLE = False
 
 
 class GuiLog(wx.PyOnDemandOutputWindow):
+    def __init__(self, title="Debug Console"):
+        # wx.PyOnDemandOutputWindow is old class style
+        # Cannot use super with old class styles
+        wx.PyOnDemandOutputWindow.__init__(self, title)
+
+    def CreateOutputWindow(self, st):
+        wx.PyOnDemandOutputWindow.CreateOutputWindow(self, st)
+        # Create debug keybinding to open debug console
+        debugid= wx.NewId()
+        self.frame.Bind(wx.EVT_MENU, self.debug_close, id=debugid)
+        mod = wx.ACCEL_CMD if sys.platform == "darwin" else wx.ACCEL_CTRL
+        accel_tbl = wx.AcceleratorTable(
+            [(mod, ord('`'), debugid)]
+        )
+        self.frame.SetAcceleratorTable(accel_tbl)
+
+    def debug_close(self, event):
+        self.frame.Close()
+
     def write(self, text, echo=True):
         if self.frame is None:
             if not wx.Thread_IsMain():
