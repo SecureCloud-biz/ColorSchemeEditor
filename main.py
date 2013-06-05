@@ -1573,6 +1573,9 @@ def errormsg(msg, title="ERROR"):
     wx.MessageBox(msg, title, wx.OK | wx.ICON_ERROR)
 
 
+#################################################
+# Theme Search methods/class support
+#################################################
 def strip_package_ext(pth):
     return pth[:-16] if pth.lower().endswith(".sublime-package") else pth
 
