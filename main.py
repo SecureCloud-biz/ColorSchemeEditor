@@ -1782,18 +1782,18 @@ class SublimeColorSchemeFiles(object):
         pattern = self.theme_files["pattern"]
         regex = bool(self.theme_files["regex"])
         self.packages = normpath(packages_path())
-        settings = []
+        self.settings = []
         plugins = sorted([join(self.packages, item) for item in listdir(self.packages) if isdir(join(self.packages, item))])
         for plugin in plugins:
-            self.walk(settings, plugin, pattern.strip(), regex)
+            self.walk(self.settings, plugin, pattern.strip(), regex)
 
-        self.zipped_idx = len(settings)
+        self.zipped_idx = len(self.settings)
 
         zipped_plugins = self.search_zipped_files(plugins)
         for plugin in zipped_plugins:
-            self.walk_zip(settings, plugin, pattern.strip(), regex)
+            self.walk_zip(self.settings, plugin, pattern.strip(), regex)
 
-        return settings
+        return self.settings
 
 
     # def open_zip_file(self, fn):
