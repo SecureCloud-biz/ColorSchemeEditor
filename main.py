@@ -1278,12 +1278,6 @@ class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
 class Editor(editor.EditorFrame, DebugFrameExtender):
     def __init__(self, parent, scheme, j_file, t_file, live_save, debugging=False):
         super(Editor, self).__init__(parent)
-        findid = wx.NewId()
-        findnextid = wx.NewId()
-        findprevid = wx.NewId()
-        saveasid = wx.NewId()
-        saveid = wx.NewId()
-        scid = wx.NewId()
         self.live_save = bool(live_save)
         self.updates_made = False
         mod = wx.ACCEL_CMD if sys.platform == "darwin" else wx.ACCEL_CTRL
@@ -1680,16 +1674,16 @@ def yesno(parent, question, caption = 'Yes or no?', bitmap=None, yes="Okay", no=
 
 
 def infomsg(parent, msg, title="INFO", bitmap=None):
-    messages.infomsg(parent, msg, title, bitmap).ShowModal()
+    messages.infomsg(parent, msg, title, bitmap)
 
 
 def errormsg(parent, msg, title="ERROR", bitmap=None):
     error(msg)
-    messages.errormsg(parent, msg, title, bitmap).ShowModal()
+    messages.errormsg(parent, msg, title, bitmap)
 
 
 def warnmsg(parent, msg, title="WARNING", bitmap=None):
-    messages.warnmsg(parent, msg, title, bitmap).ShowModal()
+    messages.warnmsg(parent, msg, title, bitmap)
 
 
 #################################################
