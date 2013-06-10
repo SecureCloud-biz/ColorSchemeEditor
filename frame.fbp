@@ -4778,7 +4778,7 @@
             <property name="name">SublimeThemeSwitcher</property>
             <property name="pos"></property>
             <property name="size">360,309</property>
-            <property name="style">wxDEFAULT_DIALOG_STYLE</property>
+            <property name="style">wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER</property>
             <property name="subclass"></property>
             <property name="title">Theme Switcher</property>
             <property name="tooltip"></property>
@@ -4955,7 +4955,7 @@
                                     <property name="minimize_button">0</property>
                                     <property name="minimum_size"></property>
                                     <property name="moveable">1</property>
-                                    <property name="name">m_listCtrl1</property>
+                                    <property name="name">m_theme_list</property>
                                     <property name="pane_border">1</property>
                                     <property name="pane_position"></property>
                                     <property name="pane_size"></property>
@@ -4965,7 +4965,7 @@
                                     <property name="resize">Resizable</property>
                                     <property name="show">1</property>
                                     <property name="size"></property>
-                                    <property name="style">wxLC_HRULES|wxLC_NO_SORT_HEADER|wxLC_REPORT|wxLC_SINGLE_SEL|wxLC_VRULES</property>
+                                    <property name="style">wxLC_HRULES|wxLC_REPORT|wxLC_SINGLE_SEL|wxLC_VRULES</property>
                                     <property name="subclass"></property>
                                     <property name="toolbar_pane">0</property>
                                     <property name="tooltip"></property>

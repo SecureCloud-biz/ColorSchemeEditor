@@ -1272,11 +1272,51 @@ class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
         event.Skip()
 
 
+class SublimeThemeSwitcher(editor.SublimeThemeSwitcher):
+    def __init__(self, parent):
+        super(SublimeThemeSwitcher, self).__init__(parent)
+        self.m_theme_list.InsertColumn(0, "Theme")
+        self.m_theme_list.InsertColumn(1, "Location")
+        self.m_theme_list.InsertColumn(2, "Path")
+        self.themes = []
+
+        self.selected = None
+
+        try:
+            self.themes = SublimeColorSchemeFiles().run()
+        except Exception as e:
+            error(e)
+
+        if len(self.themes):
+            count = 0
+            for t in self.themes:
+                self.m_theme_list.InsertStringItem(count, basename(t[0]))
+                self.m_theme_list.SetStringItem(count, 1, t[1])
+                self.m_theme_list.SetStringItem(count, 2, dirname(t[0]))
+                count += 1
+
+        for x in range(0, self.m_theme_list.GetColumnCount()):
+            self.m_theme_list.SetColumnWidth(x, wx.LIST_AUTOSIZE)
+
+    def get_theme(self):
+        return self.selected
+
+    def on_select(self, event):
+        idx = self.m_theme_list.GetFirstSelected()
+        if idx >= 0:
+            debug(self.themes[idx])
+        self.Close()
+
+    def on_cancel(self, event):
+        self.Close()
+
+
+
 #################################################
 # Editor Dialog
 #################################################
 class Editor(editor.EditorFrame, DebugFrameExtender):
-    def __init__(self, parent, scheme, j_file, t_file, live_save, debugging=False):
+    def __init__(self, parent, scheme, j_file, t_file, live_save, st_pth=None, debugging=False):
         super(Editor, self).__init__(parent)
         self.live_save = bool(live_save)
         self.updates_made = False
@@ -1302,6 +1342,9 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         self.scheme = scheme
         self.json = j_file
         self.tmtheme = t_file
+        if st_pth is not None:
+            self.st_pth = st_pth
+            self.m_sublime_switcher_menuitem.Enable(True)
         debug(scheme, fmt=lambda x: json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')))
 
         try:
@@ -1325,6 +1368,10 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         if self.live_save:
             self.update_thread = LiveUpdate(self.save, self.queue)
             self.update_thread.start()
+
+    def on_switch(self, event):
+        dlg = SublimeThemeSwitcher(self)
+        dlg.ShowModal()
 
     def update_plist(self, code, args={}):
         if code == JSON_UUID:
@@ -1952,7 +1999,10 @@ def main(script):
         j_file, t_file, cs = parse_file(args.file)
 
     if j_file is not None and t_file is not None:
-        main_win = Editor(None, cs, j_file, t_file, live_save=args.live_save, debugging=args.debug)
+        main_win = Editor(
+            None, cs, j_file, t_file,
+            live_save=args.live_save, st_pth=args.sublime_paths, debugging=args.debug
+        )
         main_win.Show()
         wx.GetApp().MainLoop()
     return 0
