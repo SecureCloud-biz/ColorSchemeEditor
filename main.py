@@ -1986,7 +1986,6 @@ def main(script):
             error(e)
 
     app = CustomApp(redirect=args.debug)  #  , single_instance_name="subclrschm")
-
     if args.file is None:
         action = ""
         if args.select:

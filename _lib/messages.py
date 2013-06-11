@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 Messages
+
 Licensed under MIT
 Copyright (c) 2013 Isaac Muse <isaacmuse@gmail.com>
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 import wx
 from collections import namedtuple
@@ -15,7 +21,9 @@ WARN = 2
 ERROR = 3
 
 # Icons
-DEFAULT_SIZE = 64
+DEFAULT_ICON_SIZE = 64
+DEFAULT_TEXT_MIN_SIZE = 250
+DEFAULT_TEXT_MAX_SIZE = 500
 
 
 # Icons by Isaac Muse
@@ -539,7 +547,13 @@ class Messages (wx.Dialog):
             fg_message_sizer.Add(self.m_bitmap, 0, wx.ALL, 5)
 
         self.m_message_text = wx.StaticText(self.m_message_panel, wx.ID_ANY, msg, wx.DefaultPosition, wx.DefaultSize, 0)
+        sz = self.m_message_text.GetSize()
+        if sz[0] < DEFAULT_TEXT_MIN_SIZE:
+            self.m_message_text.SetMinSize(wx.Size(DEFAULT_TEXT_MIN_SIZE, -1))
+        elif sz[0] > DEFAULT_TEXT_MAX_SIZE:
+            self.m_message_text.Wrap(DEFAULT_TEXT_MAX_SIZE)
         self.m_message_text.Wrap(-1)
+
         fg_message_sizer.Add(self.m_message_text, 1, wx.ALL|wx.EXPAND, 5)
 
         fg_panel_sizer.Add(fg_message_sizer, 1, wx.EXPAND, 5)
@@ -550,13 +564,13 @@ class Messages (wx.Dialog):
         if bitmap is not None:
             icon = bitmap
         elif style == ERROR:
-            icon = MessageIcon(Error.GetBitmap(), DEFAULT_SIZE, DEFAULT_SIZE)
+            icon = MessageIcon(Error.GetBitmap(), DEFAULT_ICON_SIZE, DEFAULT_ICON_SIZE)
         elif style == WARN:
-            icon = MessageIcon(Warn.GetBitmap(), DEFAULT_SIZE, DEFAULT_SIZE)
+            icon = MessageIcon(Warn.GetBitmap(), DEFAULT_ICON_SIZE, DEFAULT_ICON_SIZE)
         elif style == PROMPT:
-            icon = MessageIcon(Prompt.GetBitmap(), DEFAULT_SIZE, DEFAULT_SIZE)
+            icon = MessageIcon(Prompt.GetBitmap(), DEFAULT_ICON_SIZE, DEFAULT_ICON_SIZE)
         elif style == INFO:
-            icon = MessageIcon(Info.GetBitmap(), DEFAULT_SIZE, DEFAULT_SIZE)
+            icon = MessageIcon(Info.GetBitmap(), DEFAULT_ICON_SIZE, DEFAULT_ICON_SIZE)
 
         return icon
 
@@ -596,12 +610,18 @@ def promptmsg(parent, question, caption = 'PROMPT', bitmap=None, yes="Okay", no=
 
 
 def infomsg(parent, msg, title="INFO", bitmap=None):
-    Messages(parent, msg, title, style=INFO, bitmap=bitmap).ShowModal()
+    dlg = Messages(parent, msg, title, style=INFO, bitmap=bitmap)
+    dlg.ShowModal()
+    dlg.Destroy()
 
 
 def errormsg(parent, msg, title="ERROR", bitmap=None):
-    Messages(parent, msg, title, style=ERROR, bitmap=bitmap).ShowModal()
+    dlg = Messages(parent, msg, title, style=ERROR, bitmap=bitmap)
+    dlg.ShowModal()
+    dlg.Destroy()
 
 
 def warnmsg(parent, msg, title="WARNING", bitmap=None):
-    Messages(parent, msg, title, style=WARN, bitmap=bitmap).ShowModal()
+    dlg = Messages(parent, msg, title, style=WARN, bitmap=bitmap)
+    dlg.ShowModal()
+    dlg.Destroy()
