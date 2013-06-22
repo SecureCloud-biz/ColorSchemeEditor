@@ -19,7 +19,7 @@ from os import listdir, walk
 from _lib.default_new_theme import theme as default_new_theme
 from time import sleep, time
 import threading
-from _lib.custom_app import CustomApp, DebugFrameExtender, init_app_log, set_debug_mode, set_debug_console, get_debug_mode, get_debug_console, debug, info, warning, critical, error
+from _lib.custom_app import CustomApp, DebugFrameExtender, init_app_log, set_debug_mode, set_debug_console, get_debug_mode, get_debug_console, debug, debug_struct, info, warning, critical, error
 import zipfile
 from fnmatch import fnmatch
 import re
@@ -980,7 +980,7 @@ class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
 
     def on_global_name_blur(self, event):
         if not self.is_name_valid():
-            errormsg(self, "Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
+            errormsg("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
             self.m_name_textbox.SetValue(self.current_name)
         else:
             self.current_name = self.m_name_textbox.GetValue()
@@ -1027,7 +1027,7 @@ class GlobalEditor(editor.GlobalSetting, SettingsKeyBindings):
             self.apply_settings = True
             self.Close()
         else:
-            errormsg(self, "Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
+            errormsg("Key name \"%s\" already exists in global settings. Please use a different name." % self.m_name_textbox.GetValue())
             self.m_name_textbox.SetValue(self.current_name)
 
     def on_set_color_close(self, event):
@@ -1345,7 +1345,7 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         if st_pth is not None:
             self.st_pth = st_pth
             self.m_sublime_switcher_menuitem.Enable(True)
-        debug(scheme, fmt=lambda x: json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')))
+        debug_struct(scheme, "Color Scheme")
 
         try:
             self.m_global_settings = GlobalSettings(self.m_plist_notebook, scheme, self.update_plist, self.rebuild_tables)
@@ -1485,7 +1485,7 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
                 with codec_open(self.tmtheme, "w", "utf-8") as f:
                     f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
             except:
-                errormsg(self, 'Unexpected problem trying to write .tmTheme file!')
+                errormsg('Unexpected problem trying to write .tmTheme file!')
 
         if request == "json" or request == "all":
             try:
@@ -1495,7 +1495,7 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
                 if not self.live_save:
                     self.m_menuitem_save.Enable(False)
             except:
-                errormsg(self, 'Unexpected problem trying to write .tmTheme.JSON file!')
+                errormsg('Unexpected problem trying to write .tmTheme.JSON file!')
 
 
     def rebuild_tables(self, cur_row, cur_col):
@@ -1623,7 +1623,7 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
                 self.update_plist(JSON_UUID)
         except:
             self.on_uuid_button_click(event)
-            errormsg(self, 'UUID is invalid! A new UUID has been generated.')
+            errormsg('UUID is invalid! A new UUID has been generated.')
             debug("Bad UUID: %s!" % self.m_plist_uuid_textbox.GetValue())
         event.Skip()
 
@@ -1675,7 +1675,7 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
             self.save("all")
 
     def on_about(self, event):
-        infomsg(self, "Color Scheme Editor: version %s" % __version__, bitmap=messages.MessageIcon(AppIcon.GetBitmap(), 64, 64))
+        infomsg("Color Scheme Editor: version %s" % __version__, bitmap=messages.MessageIcon(AppIcon.GetBitmap(), 64, 64))
         event.Skip()
 
     def on_find(self, event):
@@ -1698,7 +1698,7 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
             msg = SHORTCUTS["linux"]
         else:
             msg = SHORTCUTS["windows"]
-        infomsg(self, msg,"Shortcuts")
+        infomsg(msg,"Shortcuts")
 
     def on_debug_console(self, event):
         self.open_debug_console()
@@ -1712,25 +1712,25 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
 #################################################
 # Basic Dialogs
 #################################################
-def filepicker(parent, msg, wildcard, save=False):
-    return messages.filepickermsg(parent, msg, wildcard, save)
+def filepicker(msg, wildcard, save=False):
+    return messages.filepickermsg(msg, wildcard, save)
 
 
-def yesno(parent, question, caption = 'Yes or no?', bitmap=None, yes="Okay", no="Cancel"):
-    return messages.promptmsg(parent, question, caption, bitmap, yes, no)
+def yesno(question, title='Yes or no?', bitmap=None, yes="Okay", no="Cancel"):
+    return messages.promptmsg(question, title, bitmap, yes, no)
 
 
-def infomsg(parent, msg, title="INFO", bitmap=None):
-    messages.infomsg(parent, msg, title, bitmap)
+def infomsg(msg, title="INFO", bitmap=None):
+    messages.infomsg(msg, title, bitmap)
 
 
-def errormsg(parent, msg, title="ERROR", bitmap=None):
+def errormsg(msg, title="ERROR", bitmap=None):
     error(msg)
-    messages.errormsg(parent, msg, title, bitmap)
+    messages.errormsg(_ask_hal(msg, get_user()), title, bitmap)
 
 
-def warnmsg(parent, msg, title="WARNING", bitmap=None):
-    messages.warnmsg(parent, msg, title, bitmap)
+def warnmsg(msg, title="WARNING", bitmap=None):
+    messages.warnmsg(msg, title, bitmap)
 
 
 #################################################
@@ -1915,7 +1915,7 @@ def parse_file(file_path):
         with open(file_path, "r") as f:
             color_scheme = json.loads(sanitize_json(f.read(), True)) if is_json else readPlist(f)
     except:
-        errormsg(None, 'Unexpected problem trying to parse file!')
+        errormsg('Unexpected problem trying to parse file!')
 
     if color_scheme is not None:
         if is_json:

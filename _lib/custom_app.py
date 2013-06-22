@@ -1,12 +1,21 @@
-"""
-custom app
+'''
+Custom App
+https://gist.github.com/facelessuser/5750404
+
 Licensed under MIT
 Copyright (c) 2013 Isaac Muse <isaacmuse@gmail.com>
-"""
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+'''
 
 import wx
 import simplelog
 import sys
+import json
 
 log = None
 last_level = simplelog.ERROR
@@ -112,7 +121,7 @@ class CustomApp(wx.App):
 
 
 class DebugFrameExtender(object):
-    def set_keybindings(self, keybindings, debug_event=None):
+    def set_keybindings(self, keybindings=[], debug_event=None):
         # Create keybinding to open debug console, bind debug console to ctrl/cmd + ` depending on platform
         # if an event is passed in.
         tbl = []
@@ -161,44 +170,57 @@ class DebugFrameExtender(object):
                 wx.GetApp().stdioWin.close()
 
 
+def _log_struct(obj, log_func, label="Object"):
+    log_func(obj, format="%(loglevel)s: " + label + ": %(message)s\n", fmt=json_fmt)
+
+
+def json_fmt(obj):
+    return json.dumps(obj, sort_keys=True, indent=4, separators=(',', ': '))
+
+
 def gui_log(msg):
     log._log(msg, echo=False)
 
 
-def debug(msg, echo=True, fmt=None):
+def debug(msg, echo=True, format="%(loglevel)s: %(message)s\n", fmt=None):
     if get_debug_mode():
-        if fmt is not None:
-            log.debug(msg, echo=echo, fmt=fmt)
-        else:
-            log.debug(msg, echo=echo)
+        log.debug(msg, echo=echo, format=format, fmt=fmt)
 
 
-def info(msg, echo=True, fmt=None):
-    if fmt is not None:
-        log.info(msg, echo=echo, fmt=fmt)
-    else:
-        log.info(msg, echo=echo)
+def info(msg, echo=True, format="%(loglevel)s: %(message)s\n", fmt=None):
+    log.info(msg, echo=echo, format=format, fmt=fmt)
 
 
-def critical(msg, echo=True, fmt=None):
-    if fmt is not None:
-        log.critical(msg, echo=echo, fmt=fmt)
-    else:
-        log.critical(msg, echo=echo)
+def critical(msg, echo=True, format="%(loglevel)s: %(message)s\n", fmt=None):
+    log.critical(msg, echo=echo, format=format, fmt=fmt)
 
 
-def warning(msg, echo=True, fmt=None):
-    if fmt is not None:
-        log.warning(msg, echo=echo, fmt=fmt)
-    else:
-        log.warning(msg, echo=echo)
+def warning(msg, echo=True, format="%(loglevel)s: %(message)s\n", fmt=None):
+    log.warning(msg, echo=echo, format=format, fmt=fmt)
 
 
-def error(msg, echo=True, fmt=None):
-    if fmt is not None:
-        log.error(msg, echo=echo, fmt=fmt)
-    else:
-        log.error(msg, echo=echo)
+def error(msg, echo=True, format="%(loglevel)s: %(message)s\n", fmt=None):
+    log.error(msg, echo=echo, format=format, fmt=fmt)
+
+
+def debug_struct(obj, label="Object"):
+    _log_struct(obj, debug, label)
+
+
+def info_struct(obj, label="Object"):
+    _log_struct(obj, info, label)
+
+
+def critical_struct(obj, label="Object"):
+    _log_struct(obj, critical, label)
+
+
+def warning_struct(obj, label="Object"):
+    _log_struct(obj, warning, label)
+
+
+def error_struct(obj, label="Object"):
+    _log_struct(obj, error, label)
 
 
 def init_app_log(name, level=simplelog.ERROR):
