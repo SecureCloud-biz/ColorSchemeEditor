@@ -1726,7 +1726,7 @@ def infomsg(msg, title="INFO", bitmap=None):
 
 def errormsg(msg, title="ERROR", bitmap=None):
     error(msg)
-    messages.errormsg(_ask_hal(msg, get_user()), title, bitmap)
+    messages.errormsg(msg, title, bitmap)
 
 
 def warnmsg(msg, title="WARNING", bitmap=None):
