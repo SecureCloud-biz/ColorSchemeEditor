@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Messages
+https://gist.github.com/facelessuser/5749982
 
 Licensed under MIT
 Copyright (c) 2013 Isaac Muse <isaacmuse@gmail.com>
@@ -13,6 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 import wx
 from collections import namedtuple
 from wx.lib.embeddedimage import PyEmbeddedImage
+import re
 
 # Styles
 INFO = 0
@@ -24,6 +26,8 @@ ERROR = 3
 DEFAULT_ICON_SIZE = 64
 DEFAULT_TEXT_MIN_SIZE = 250
 DEFAULT_TEXT_MAX_SIZE = 500
+
+HAS_CAPTION = re.compile(r"([^\r\n]+)(?:\r?\n){2,}(.*)", re.DOTALL|re.UNICODE)
 
 
 # Icons by Isaac Muse
@@ -473,7 +477,15 @@ class MessageIcon (namedtuple('MessageIcon', ['bitmap', 'width', 'height'], verb
 ## Class Messages
 ###########################################################################
 class Messages (wx.Dialog):
-    def __init__(self, parent, msg, title=wx.EmptyString, style=INFO, bitmap=None, yes="Okay", no="Cancel"):
+    def __init__(self, parent, text, title=wx.EmptyString, style=INFO, bitmap=None, yes="Okay", no="Cancel"):
+        m = HAS_CAPTION.match(text)
+        if m is not None:
+            caption = m.group(1)
+            msg = m.group(2)
+        else:
+            caption = None
+            msg = text
+
         self.answer = wx.ID_CANCEL if style == PROMPT else wx.ID_OK
 
         wx.Dialog.__init__(self, parent, id=wx.ID_ANY, title=title, pos=wx.DefaultPosition, size=wx.DefaultSize, style=wx.DEFAULT_DIALOG_STYLE)
@@ -488,7 +500,7 @@ class Messages (wx.Dialog):
         fg_panel_sizer.SetFlexibleDirection(wx.BOTH)
         fg_panel_sizer.SetNonFlexibleGrowMode(wx.FLEX_GROWMODE_SPECIFIED)
 
-        self._setup_message(fg_panel_sizer, msg, style, bitmap)
+        self._setup_message(fg_panel_sizer, msg, caption, style, bitmap)
 
         fg_button_row_sizer = wx.FlexGridSizer(0, 3, 0, 0)
         fg_button_row_sizer.AddGrowableCol(0)
@@ -512,6 +524,8 @@ class Messages (wx.Dialog):
         b_dialog_sizer.Fit(self)
 
         self.Centre(wx.BOTH)
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
+        self.m_accept_button.SetFocus()
 
     def _setup_buttons(self, fg_button_row_sizer, style, yes, no):
         fg_button_sizer = wx.FlexGridSizer(0, 2, 0, 0) if style == PROMPT else wx.FlexGridSizer(0, 1, 0, 0)
@@ -529,7 +543,7 @@ class Messages (wx.Dialog):
 
         fg_button_row_sizer.Add(fg_button_sizer, 1, wx.EXPAND, 5)
 
-    def _setup_message(self, fg_panel_sizer, msg, style, bitmap):
+    def _setup_message(self, fg_panel_sizer, msg, caption, style, bitmap):
         bm = self._get_bitmap(style, bitmap)
 
         if bm is not None:
@@ -552,9 +566,33 @@ class Messages (wx.Dialog):
             self.m_message_text.SetMinSize(wx.Size(DEFAULT_TEXT_MIN_SIZE, -1))
         elif sz[0] > DEFAULT_TEXT_MAX_SIZE:
             self.m_message_text.Wrap(DEFAULT_TEXT_MAX_SIZE)
-        self.m_message_text.Wrap(-1)
+        else:
+            self.m_message_text.Wrap(-1)
 
-        fg_message_sizer.Add(self.m_message_text, 1, wx.ALL|wx.EXPAND, 5)
+        if caption is not None:
+            fg_text_sizer = wx.FlexGridSizer(2, 1, 0, 0)
+            fg_text_sizer.AddGrowableCol(0)
+            fg_text_sizer.AddGrowableRow(1)
+            fg_text_sizer.SetFlexibleDirection(wx.BOTH)
+            fg_text_sizer.SetNonFlexibleGrowMode(wx.FLEX_GROWMODE_SPECIFIED)
+            self.m_caption_text = wx.StaticText(self.m_message_panel, wx.ID_ANY, caption, wx.DefaultPosition, wx.DefaultSize, 0)
+            font = self.m_caption_text.GetFont()
+            font.SetWeight(wx.FONTWEIGHT_BOLD)
+            self.m_caption_text.SetFont(font)
+
+            caption_sz = self.m_caption_text.GetSize()
+            if caption_sz[0] < DEFAULT_TEXT_MIN_SIZE:
+                self.m_caption_text.SetMinSize(wx.Size(DEFAULT_TEXT_MIN_SIZE, -1))
+            elif caption_sz[0] > DEFAULT_TEXT_MAX_SIZE:
+                self.m_caption_text.Wrap(DEFAULT_TEXT_MAX_SIZE)
+            else:
+                self.m_caption_text.Wrap(-1)
+
+            fg_text_sizer.Add(self.m_caption_text, 1, wx.ALL|wx.EXPAND, 5)
+            fg_text_sizer.Add(self.m_message_text, 1, wx.ALL|wx.EXPAND, 5)
+            fg_message_sizer.Add(fg_text_sizer, 1, wx.EXPAND, 5)
+        else:
+            fg_message_sizer.Add(self.m_message_text, 1, wx.ALL|wx.EXPAND, 5)
 
         fg_panel_sizer.Add(fg_message_sizer, 1, wx.EXPAND, 5)
 
@@ -577,22 +615,25 @@ class Messages (wx.Dialog):
     def __del__(self):
         pass
 
+    def on_char_hook(self, event):
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.answer = wx.ID_CANCEL
+            self.EndModal(self.answer)
+
     def on_cancel(self, event):
         self.answer = wx.ID_CANCEL
         self.EndModal(self.answer)
-        self.Close()
 
     def on_accept(self, event):
         self.answer = wx.ID_OK
         self.EndModal(self.answer)
-        self.Close()
 
 
-def filepickermsg(parent, msg, wildcard, save=False):
+def filepickermsg(msg, wildcard, save=False):
     select = None
     style = wx.OPEN | wx.FILE_MUST_EXIST if not save else wx.SAVE | wx.OVERWRITE_PROMPT
     dlg = wx.FileDialog(
-        parent, msg,
+        None, msg,
         "", wildcard=wildcard,
         style=style
     )
@@ -602,26 +643,26 @@ def filepickermsg(parent, msg, wildcard, save=False):
     return select
 
 
-def promptmsg(parent, question, caption = 'PROMPT', bitmap=None, yes="Okay", no="Cancel"):
-    dlg = Messages(parent, question, caption, style=PROMPT, yes=yes, no=no, bitmap=bitmap)
+def promptmsg(question, caption = 'PROMPT', bitmap=None, yes="Okay", no="Cancel"):
+    dlg = Messages(None, question, caption, style=PROMPT, yes=yes, no=no, bitmap=bitmap)
     result = dlg.ShowModal() == wx.ID_OK
     dlg.Destroy()
     return result
 
 
-def infomsg(parent, msg, title="INFO", bitmap=None):
-    dlg = Messages(parent, msg, title, style=INFO, bitmap=bitmap)
+def infomsg(msg, title="INFO", bitmap=None):
+    dlg = Messages(None, msg, title, style=INFO, bitmap=bitmap)
     dlg.ShowModal()
     dlg.Destroy()
 
 
-def errormsg(parent, msg, title="ERROR", bitmap=None):
-    dlg = Messages(parent, msg, title, style=ERROR, bitmap=bitmap)
+def errormsg(msg, title="ERROR", bitmap=None):
+    dlg = Messages(None, msg, title, style=ERROR, bitmap=bitmap)
     dlg.ShowModal()
     dlg.Destroy()
 
 
-def warnmsg(parent, msg, title="WARNING", bitmap=None):
-    dlg = Messages(parent, msg, title, style=WARN, bitmap=bitmap)
+def warnmsg(msg, title="WARNING", bitmap=None):
+    dlg = Messages(None, msg, title, style=WARN, bitmap=bitmap)
     dlg.ShowModal()
     dlg.Destroy()
