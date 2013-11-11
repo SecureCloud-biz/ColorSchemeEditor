@@ -1598,7 +1598,7 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         if self.live_save and self.updates_made:
             self.save("json")
         elif not self.live_save and self.updates_made:
-            if yesno(self, "You have unsaved changes.  Save?", "Color Scheme Editor"):
+            if yesno("You have unsaved changes.  Save?", "Color Scheme Editor"):
                 self.save("all")
 
     def on_plist_name_blur(self, event):
@@ -1657,13 +1657,13 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         if save_file is not None:
             j_file = None
             t_file = None
-            is_json = file_path.lower().endswith("tmtheme.json")
+            is_json = save_file.lower().endswith("tmtheme.json")
             if is_json:
-                j_file = file_path
-                t_file = file_path[:-5]
+                j_file = save_file
+                t_file = save_file[:-5]
             else:
-                j_file = file_path + ".JSON"
-                t_file = file_path
+                j_file = save_file + ".JSON"
+                t_file = save_file
             self.json = j_file
             self.tmtheme = t_file
             self.SetTitle("Color Scheme Editor - %s" % basename(t_file))
@@ -1872,26 +1872,26 @@ def query_user_for_file(parent, action):
     else:
         wildcard = "(*.tmTheme;*.tmTheme.JSON)|*.tmTheme;*.tmTheme.JSON"
     if not select_file and not new_file:
-        select = yesno(parent, "Create a new theme or select an existing one?", "Color Scheme Editor", yes="Select", no="New")
+        select = yesno("Create a new theme or select an existing one?", "Color Scheme Editor", yes="Select", no="New")
     elif select_file:
         select = True
     while not done:
         if select:
-            result = filepicker(parent, "Choose a theme file:", wildcard)
+            result = filepicker( "Choose a theme file:", wildcard)
             if result is not None:
                 debug(result)
                 if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
-                    errormsg(parent, "File must be of type '.tmtheme' or '.tmtheme.json'")
+                    errormsg("File must be of type '.tmtheme' or '.tmtheme.json'")
                     debug("Select: Bad extension: %s" % result)
                     continue
                 file_path = result
                 debug("Select: File selected: %s" % file_path)
             done = True
         else:
-            result = filepicker(parent, "Theme file to save:", wildcard, True)
+            result = filepicker("Theme file to save:", wildcard, True)
             if result is not None:
                 if not result.lower().endswith(".tmtheme.json") and not result.lower().endswith(".tmtheme"):
-                    errormsg(parent, "File must be of type '.tmtheme' or '.tmtheme.json'")
+                    errormsg("File must be of type '.tmtheme' or '.tmtheme.json'")
                     debug("New: Bad extension: %s" % result)
                     continue
                 if result.lower().endswith("tmtheme.json"):

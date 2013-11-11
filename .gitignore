@@ -3,3 +3,11 @@
 .DS_Store
 
 *.log
+
+build/
+
+dist/
+
+pyinstaller/
+
+*.spec

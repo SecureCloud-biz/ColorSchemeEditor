@@ -12,9 +12,10 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 import wx
+import re
 from collections import namedtuple
 from wx.lib.embeddedimage import PyEmbeddedImage
-import re
+
 
 # Styles
 INFO = 0
@@ -27,7 +28,7 @@ DEFAULT_ICON_SIZE = 64
 DEFAULT_TEXT_MIN_SIZE = 250
 DEFAULT_TEXT_MAX_SIZE = 500
 
-HAS_CAPTION = re.compile(r"([^\r\n]+)(?:\r?\n){2,}(.*)", re.DOTALL|re.UNICODE)
+HAS_CAPTION = re.compile(r"([^\r\n]+)(?:\r?\n){2,}(.*)", re.DOTALL | re.UNICODE)
 
 
 # Icons by Isaac Muse
@@ -472,12 +473,15 @@ class MessageIcon (namedtuple('MessageIcon', ['bitmap', 'width', 'height'], verb
     pass
 
 
-
 ###########################################################################
 ## Class Messages
 ###########################################################################
 class Messages (wx.Dialog):
     def __init__(self, parent, text, title=wx.EmptyString, style=INFO, bitmap=None, yes="Okay", no="Cancel"):
+        """
+        Init Messages object
+        """
+
         m = HAS_CAPTION.match(text)
         if m is not None:
             caption = m.group(1)
@@ -517,7 +521,7 @@ class Messages (wx.Dialog):
         self.m_message_panel.SetSizer(fg_panel_sizer)
         self.m_message_panel.Layout()
         fg_panel_sizer.Fit(self.m_message_panel)
-        b_dialog_sizer.Add(self.m_message_panel, 1, wx.EXPAND |wx.ALL, 5)
+        b_dialog_sizer.Add(self.m_message_panel, 1, wx.EXPAND | wx.ALL, 5)
 
         self.SetSizer(b_dialog_sizer)
         self.Layout()
@@ -528,6 +532,10 @@ class Messages (wx.Dialog):
         self.m_accept_button.SetFocus()
 
     def _setup_buttons(self, fg_button_row_sizer, style, yes, no):
+        """
+        Setup the appropriate buttons for the dialog
+        """
+
         fg_button_sizer = wx.FlexGridSizer(0, 2, 0, 0) if style == PROMPT else wx.FlexGridSizer(0, 1, 0, 0)
         fg_button_sizer.SetFlexibleDirection(wx.BOTH)
         fg_button_sizer.SetNonFlexibleGrowMode(wx.FLEX_GROWMODE_SPECIFIED)
@@ -544,6 +552,10 @@ class Messages (wx.Dialog):
         fg_button_row_sizer.Add(fg_button_sizer, 1, wx.EXPAND, 5)
 
     def _setup_message(self, fg_panel_sizer, msg, caption, style, bitmap):
+        """
+        Setup the message
+        """
+
         bm = self._get_bitmap(style, bitmap)
 
         if bm is not None:
@@ -588,15 +600,19 @@ class Messages (wx.Dialog):
             else:
                 self.m_caption_text.Wrap(-1)
 
-            fg_text_sizer.Add(self.m_caption_text, 1, wx.ALL|wx.EXPAND, 5)
-            fg_text_sizer.Add(self.m_message_text, 1, wx.ALL|wx.EXPAND, 5)
+            fg_text_sizer.Add(self.m_caption_text, 1, wx.ALL | wx.EXPAND, 5)
+            fg_text_sizer.Add(self.m_message_text, 1, wx.ALL | wx.EXPAND, 5)
             fg_message_sizer.Add(fg_text_sizer, 1, wx.EXPAND, 5)
         else:
-            fg_message_sizer.Add(self.m_message_text, 1, wx.ALL|wx.EXPAND, 5)
+            fg_message_sizer.Add(self.m_message_text, 1, wx.ALL | wx.EXPAND, 5)
 
         fg_panel_sizer.Add(fg_message_sizer, 1, wx.EXPAND, 5)
 
     def _get_bitmap(self, style, bitmap):
+        """
+        Get the appropriate icon
+        """
+
         icon = None
 
         if bitmap is not None:
@@ -616,20 +632,36 @@ class Messages (wx.Dialog):
         pass
 
     def on_char_hook(self, event):
+        """
+        Cancel on escape
+        """
+
         if event.GetKeyCode() == wx.WXK_ESCAPE:
             self.answer = wx.ID_CANCEL
             self.EndModal(self.answer)
 
     def on_cancel(self, event):
+        """
+        Set cancel status
+        """
+
         self.answer = wx.ID_CANCEL
         self.EndModal(self.answer)
 
     def on_accept(self, event):
+        """
+        Set OK status
+        """
+
         self.answer = wx.ID_OK
         self.EndModal(self.answer)
 
 
 def filepickermsg(msg, wildcard, save=False):
+    """
+    File picker
+    """
+
     select = None
     style = wx.OPEN | wx.FILE_MUST_EXIST if not save else wx.SAVE | wx.OVERWRITE_PROMPT
     dlg = wx.FileDialog(
@@ -643,7 +675,29 @@ def filepickermsg(msg, wildcard, save=False):
     return select
 
 
-def promptmsg(question, caption = 'PROMPT', bitmap=None, yes="Okay", no="Cancel"):
+def dirpickermsg(msg, default_path=""):
+    """
+    Directory picker
+    """
+
+    select = None
+    style = wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST
+    dlg = wx.DirDialog(
+        None, msg,
+        default_path,
+        style=style
+    )
+    if dlg.ShowModal() == wx.ID_OK:
+        select = dlg.GetPath()
+    dlg.Destroy()
+    return select
+
+
+def promptmsg(question, caption='PROMPT', bitmap=None, yes="Okay", no="Cancel"):
+    """
+    Prompt with "yes" "no" type object
+    """
+
     dlg = Messages(None, question, caption, style=PROMPT, yes=yes, no=no, bitmap=bitmap)
     result = dlg.ShowModal() == wx.ID_OK
     dlg.Destroy()
@@ -651,18 +705,30 @@ def promptmsg(question, caption = 'PROMPT', bitmap=None, yes="Okay", no="Cancel"
 
 
 def infomsg(msg, title="INFO", bitmap=None):
+    """
+    Info message
+    """
+
     dlg = Messages(None, msg, title, style=INFO, bitmap=bitmap)
     dlg.ShowModal()
     dlg.Destroy()
 
 
 def errormsg(msg, title="ERROR", bitmap=None):
+    """
+    Error message
+    """
+
     dlg = Messages(None, msg, title, style=ERROR, bitmap=bitmap)
     dlg.ShowModal()
     dlg.Destroy()
 
 
 def warnmsg(msg, title="WARNING", bitmap=None):
+    """
+    Warning message
+    """
+
     dlg = Messages(None, msg, title, style=WARN, bitmap=bitmap)
     dlg.ShowModal()
     dlg.Destroy()
