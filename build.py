@@ -214,7 +214,7 @@ def main():
     if _PLATFORM == "osx":
         args = Args("main.py", inputs.name, True, inputs.clean, ".app", abspath("_icons/subclrschm.icns"))
     elif _PLATFORM == "windows":
-        args = Args("main.py", inputs.name, True, inputs.clean, ".exe") #, abspath("_icons\\subclrschm.ico"), inputs.portable)
+        args = Args("main.py", inputs.name, True, inputs.clean, ".exe", abspath("_icons\\subclrschm.ico"), inputs.portable)
     else:
         args = Args("main.py", inputs.name, True, inputs.clean, "")
 
