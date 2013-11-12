@@ -21,7 +21,7 @@ from time import sleep, time
 from wx.lib.embeddedimage import PyEmbeddedImage
 
 from _lib.custom_app import CustomApp, DebugFrameExtender, init_app_log
-from _lib.custom_app import set_debug_mode, set_debug_console, get_debug_mode, get_debug_console,
+from _lib.custom_app import set_debug_mode, set_debug_console, get_debug_mode, get_debug_console
 from _lib.custom_app import debug, debug_struct, info, warning, critical, error
 from _lib.file_strip.json import sanitize_json
 from _lib.default_new_theme import theme as default_new_theme
