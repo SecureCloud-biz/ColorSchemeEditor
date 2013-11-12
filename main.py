@@ -5,34 +5,34 @@ Licensed under MIT
 Copyright (c) 2013 Isaac Muse <isaacmuse@gmail.com>
 """
 import sys
-import argparse
-import json
-from plistlib import readPlist, writePlistToString
-from _lib.file_strip.json import sanitize_json
-from codecs import open as codec_open
 import wx
+import argparse
+import re
+import threading
+import json
+import codecs
 import editor
-from _lib.rgba import RGBA
 import uuid
+
+from plistlib import readPlist, writePlistToString
 from os.path import exists, normpath, join, dirname, abspath, basename, isdir
 from os import listdir, walk
-from _lib.default_new_theme import theme as default_new_theme
 from time import sleep, time
-import threading
-from _lib.custom_app import CustomApp, DebugFrameExtender, init_app_log, set_debug_mode, set_debug_console, get_debug_mode, get_debug_console, debug, debug_struct, info, warning, critical, error
-import zipfile
-from fnmatch import fnmatch
-import re
-from _lib import messages
 from wx.lib.embeddedimage import PyEmbeddedImage
+
+from _lib.custom_app import CustomApp, DebugFrameExtender, init_app_log
+from _lib.custom_app import set_debug_mode, set_debug_console, get_debug_mode, get_debug_console,
+from _lib.custom_app import debug, debug_struct, info, warning, critical, error
+from _lib.file_strip.json import sanitize_json
+from _lib.default_new_theme import theme as default_new_theme
+from _lib import messages
+from _lib.rgba import RGBA
 
 __version__ = "0.0.9"
 
 BG_COLOR = None
 FG_COLOR = None
 DEBUG_CONSOLE = False
-
-SUBLIME_PATHS = None
 
 SHORTCUTS = {
     "osx": u'''
@@ -98,6 +98,7 @@ Toggle 'italic' font: I
 Toggle 'underlined' font: U
 '''
 }
+
 
 # Icon by Isaac Muse
 AppIcon = PyEmbeddedImage(
@@ -1272,51 +1273,11 @@ class ColorEditor(editor.ColorSetting, SettingsKeyBindings):
         event.Skip()
 
 
-class SublimeThemeSwitcher(editor.SublimeThemeSwitcher):
-    def __init__(self, parent):
-        super(SublimeThemeSwitcher, self).__init__(parent)
-        self.m_theme_list.InsertColumn(0, "Theme")
-        self.m_theme_list.InsertColumn(1, "Location")
-        self.m_theme_list.InsertColumn(2, "Path")
-        self.themes = []
-
-        self.selected = None
-
-        try:
-            self.themes = SublimeColorSchemeFiles().run()
-        except Exception as e:
-            error(e)
-
-        if len(self.themes):
-            count = 0
-            for t in self.themes:
-                self.m_theme_list.InsertStringItem(count, basename(t[0]))
-                self.m_theme_list.SetStringItem(count, 1, t[1])
-                self.m_theme_list.SetStringItem(count, 2, dirname(t[0]))
-                count += 1
-
-        for x in range(0, self.m_theme_list.GetColumnCount()):
-            self.m_theme_list.SetColumnWidth(x, wx.LIST_AUTOSIZE)
-
-    def get_theme(self):
-        return self.selected
-
-    def on_select(self, event):
-        idx = self.m_theme_list.GetFirstSelected()
-        if idx >= 0:
-            debug(self.themes[idx])
-        self.Close()
-
-    def on_cancel(self, event):
-        self.Close()
-
-
-
 #################################################
 # Editor Dialog
 #################################################
 class Editor(editor.EditorFrame, DebugFrameExtender):
-    def __init__(self, parent, scheme, j_file, t_file, live_save, st_pth=None, debugging=False):
+    def __init__(self, parent, scheme, j_file, t_file, live_save, debugging=False):
         super(Editor, self).__init__(parent)
         self.live_save = bool(live_save)
         self.updates_made = False
@@ -1342,9 +1303,6 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         self.scheme = scheme
         self.json = j_file
         self.tmtheme = t_file
-        if st_pth is not None:
-            self.st_pth = st_pth
-            self.m_sublime_switcher_menuitem.Enable(True)
         debug_struct(scheme, "Color Scheme")
 
         try:
@@ -1368,10 +1326,6 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         if self.live_save:
             self.update_thread = LiveUpdate(self.save, self.queue)
             self.update_thread.start()
-
-    def on_switch(self, event):
-        dlg = SublimeThemeSwitcher(self)
-        dlg.ShowModal()
 
     def update_plist(self, code, args={}):
         if code == JSON_UUID:
@@ -1482,14 +1436,14 @@ class Editor(editor.EditorFrame, DebugFrameExtender):
         debug("%s requested save - %s" % (requester, request))
         if request == "tmtheme" or request == "all":
             try:
-                with codec_open(self.tmtheme, "w", "utf-8") as f:
+                with codecs.open(self.tmtheme, "w", "utf-8") as f:
                     f.write((writePlistToString(self.scheme) + '\n').decode('utf8'))
             except:
                 errormsg('Unexpected problem trying to write .tmTheme file!')
 
         if request == "json" or request == "all":
             try:
-                with codec_open(self.json, "w", "utf-8") as f:
+                with codecs.open(self.json, "w", "utf-8") as f:
                     f.write((json.dumps(self.scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
                 self.updates_made = False
                 if not self.live_save:
@@ -1734,131 +1688,6 @@ def warnmsg(msg, title="WARNING", bitmap=None):
 
 
 #################################################
-# Theme Search methods/class support
-#################################################
-def strip_package_ext(pth):
-    return pth[:-16] if pth.lower().endswith(".sublime-package") else pth
-
-
-def sublime_format_path(pth):
-    m = re.match(r"^([A-Za-z]{1}):(?:/|\\)(.*)", pth)
-    if sys.platform.startswith('win') and m != None:
-        pth = m.group(1) + "/" + m.group(2)
-    return pth.replace("\\", "/")
-
-
-def packages_path():
-    return SUBLIME_PATHS[2] if SUBLIME_PATHS is not None else None
-
-
-def installed_packages_path():
-    return SUBLIME_PATHS[1] if SUBLIME_PATHS is not None else None
-
-
-def default_packages_path():
-    return SUBLIME_PATHS[0] if SUBLIME_PATHS is not None else None
-
-
-class SublimeColorSchemeFiles(object):
-    theme_files = {"pattern": "*.tmTheme", "regex": False}
-
-    def find_files(self, files, pattern, settings, regex):
-        for f in files:
-            if regex:
-                if re.match(pattern, f[0], re.IGNORECASE) != None:
-                    settings.append([f[0].replace(self.packages, "").lstrip("\\").lstrip("/"), f[1]])
-            else:
-                if fnmatch(f[0], pattern):
-                    settings.append([f[0].replace(self.packages, "").lstrip("\\").lstrip("/"), f[1]])
-
-    def walk(self, settings, plugin, pattern, regex=False):
-        for base, dirs, files in walk(plugin):
-            files = [(join(base, f), "Packages") for f in files]
-            self.find_files(files, pattern, settings, regex)
-
-    def get_zip_packages(self, file_path, package_type):
-        for item in listdir(file_path):
-            if fnmatch(item, "*.sublime-package"):
-                yield (join(file_path, item), package_type)
-
-    def search_zipped_files(self, unpacked):
-        installed = []
-        default = []
-        st_packages = [installed_packages_path(), default_packages_path()]
-        unpacked_path = sublime_format_path(self.packages)
-        default_path = sublime_format_path(st_packages[1])
-        installed_path = sublime_format_path(st_packages[0])
-        for p in self.get_zip_packages(st_packages[0], "Installed"):
-            name = strip_package_ext(sublime_format_path(p[0]).replace(installed_path, ""))
-            keep = True
-            for i in unpacked:
-                if name == sublime_format_path(i).replace(unpacked_path, ""):
-                    keep = False
-                    break
-            if keep:
-                installed.append(p)
-
-        for p in self.get_zip_packages(st_packages[1], "Default"):
-            name = strip_package_ext(sublime_format_path(p[0]).replace(default_path, ""))
-            keep = True
-            for i in installed:
-                if name == strip_package_ext(sublime_format_path(i[0]).replace(installed_path, "")):
-                    keep = False
-                    break
-            for i in unpacked:
-                if name == strip_package_ext(sublime_format_path(i[0]).replace(unpacked_path, "")):
-                    keep = False
-                    break
-            if keep:
-                default.append(p)
-        return sorted(default) + sorted(installed)
-
-    def walk_zip(self, settings, plugin, pattern, regex):
-        with zipfile.ZipFile(plugin[0], 'r') as z:
-            zipped = [(join(strip_package_ext(basename(plugin[0])), normpath(fn)), plugin[1]) for fn in sorted(z.namelist())]
-            self.find_files(zipped, pattern, settings, regex)
-
-    def run(self, edit=True):
-        self.edit = edit
-        pattern = self.theme_files["pattern"]
-        regex = bool(self.theme_files["regex"])
-        self.packages = normpath(packages_path())
-        self.settings = []
-        plugins = sorted([join(self.packages, item) for item in listdir(self.packages) if isdir(join(self.packages, item))])
-        for plugin in plugins:
-            self.walk(self.settings, plugin, pattern.strip(), regex)
-
-        self.zipped_idx = len(self.settings)
-
-        zipped_plugins = self.search_zipped_files(plugins)
-        for plugin in zipped_plugins:
-            self.walk_zip(self.settings, plugin, pattern.strip(), regex)
-
-        return self.settings
-
-
-    # def open_zip_file(self, fn):
-    #     file_name = None
-    #     zip_package = None
-    #     zip_file = None
-    #     for zp in sublime_package_paths():
-    #         items = fn.replace('\\', '/').split('/')
-    #         zip_package = items.pop(0)
-    #         zip_file = '/'.join(items)
-    #         if exists(join(zp, zip_package)):
-    #             zip_package = join(zp, zip_package)
-    #             file_name = join(zp, fn)
-    #             break
-
-    #     if file_name is not None:
-    #         with zipfile.ZipFile(zip_package, 'r') as z:
-    #             text = z.read(z.getinfo(zip_file))
-    #             view = self.window.open_file(file_name)
-    #             WriteArchivedPackageContentCommand.bfr = text.decode('utf-8').replace('\r', '')
-    #             sublime.set_timeout(lambda: view.run_command("write_archived_package_content"), 0)
-
-
-#################################################
 # Helper Functions
 #################################################
 def query_user_for_file(parent, action):
@@ -1895,10 +1724,10 @@ def query_user_for_file(parent, action):
                     debug("New: Bad extension: %s" % result)
                     continue
                 if result.lower().endswith("tmtheme.json"):
-                    with codec_open(result, "w", "utf-8") as f:
+                    with codecs.open(result, "w", "utf-8") as f:
                         f.write((json.dumps(default_new_theme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
                 else:
-                    with codec_open(result, "w", "utf-8") as f:
+                    with codecs.open(result, "w", "utf-8") as f:
                         f.write((writePlistToString(default_new_theme) + '\n').decode('utf8'))
                 file_path = result
                 debug("New: File selected: %s" % file_path)
@@ -1924,7 +1753,7 @@ def parse_file(file_path):
 
             if not exists(t_file):
                 try:
-                    with codec_open(t_file, "w", "utf-8") as f:
+                    with codecs.open(t_file, "w", "utf-8") as f:
                         f.write((writePlistToString(color_scheme) + '\n').decode('utf8'))
                 except:
                     debug("tmTheme file write error!")
@@ -1934,7 +1763,7 @@ def parse_file(file_path):
 
             if not exists(j_file):
                 try:
-                    with codec_open(j_file, "w", "utf-8") as f:
+                    with codecs.open(j_file, "w", "utf-8") as f:
                         f.write((json.dumps(color_scheme, sort_keys=True, indent=4, separators=(',', ': ')) + '\n').decode('raw_unicode_escape'))
                 except:
                     debug("JSON file write error!")
@@ -1949,7 +1778,6 @@ def parse_arguments(script):
     parser.add_argument('--debug', '-d', action='store_true', default=False, help=argparse.SUPPRESS)
     parser.add_argument('--log', '-l', nargs='?', default=script, help="Absolute path to directory to store log file")
     parser.add_argument('--live_save', '-L', action='store_true', default=False, help="Enable live save.")
-    parser.add_argument('--sublime_paths', nargs=3, default=None, help="Sublime plugin paths (3): Default Installed User")
     # Mutually exclusinve flags
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--select', '-s', action='store_true', default=False, help="Prompt for theme selection")
@@ -1977,14 +1805,6 @@ def main(script):
     debug('Starting ColorSchemeEditor')
     debug('Arguments = %s' % str(args))
 
-    if args.sublime_paths is not None:
-        global SUBLIME_PATHS
-        SUBLIME_PATHS = [args.sublime_paths[0], args.sublime_paths[1], args.sublime_paths[2]]
-        try:
-            debug(SublimeColorSchemeFiles().run())
-        except Exception as e:
-            error(e)
-
     app = CustomApp(redirect=args.debug)  #  , single_instance_name="subclrschm")
     if args.file is None:
         action = ""
@@ -2000,7 +1820,7 @@ def main(script):
     if j_file is not None and t_file is not None:
         main_win = Editor(
             None, cs, j_file, t_file,
-            live_save=args.live_save, st_pth=args.sublime_paths, debugging=args.debug
+            live_save=args.live_save, debugging=args.debug
         )
         main_win.Show()
         wx.GetApp().MainLoop()
